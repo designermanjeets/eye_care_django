@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize the OpenAI client
-open_api_key = os.getenv("OPENAI_API_KEY")
+open_api_key = 'sk-proj-mAXZZZDvVxXGzfCTRyzWT3BlbkFJ4E6evgW1CIkgbO68muqz'
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
 
 client = OpenAI(api_key=open_api_key)
