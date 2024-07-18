@@ -15,6 +15,9 @@ from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from langchain.chat_models import ChatOpenAI
+from openai import OpenAI
+client = OpenAI()
+
 import json
 
 from dotenv import load_dotenv
@@ -69,7 +72,7 @@ def identify_intent(user_query):
        Is it related to rescheduling an appointment, canceling an appointment, booking an appointment or something else?"""
     )
 
-    chat_completion = openai.ChatCompletion.create(
+    chat_completion = client.chat.completions.create(
         messages=[
             {
                 "role": "user",
