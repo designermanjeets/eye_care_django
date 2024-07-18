@@ -16,6 +16,9 @@ import sys
 from distutils.util import strtobool
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / "subdir".
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -91,12 +94,21 @@ WSGI_APPLICATION = "config.wsgi.application"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "hello"),
-        "USER": os.getenv("POSTGRES_USER", "hello"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "password"),
-        "HOST": os.getenv("POSTGRES_HOST", "postgres"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+        # "ENGINE": "django.db.backends.postgresql",
+        # "NAME": os.getenv("POSTGRES_DB", "hello"),
+        # "USER": os.getenv("POSTGRES_USER", "hello"),
+        # "PASSWORD": os.getenv("POSTGRES_PASSWORD", "password"),
+        # "HOST": os.getenv("POSTGRES_HOST", "postgres"),
+        # "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        # 'ENGINE': 'django.db.backends.mysql',
+        # 'NAME': 'classroomdb',
+        # 'USER': 'root',
+        # 'PASSWORD': 'Lucky@11',
+        # 'HOST': '127.0.0.1',
+        # 'PORT': '3306',
+
     }
 }
 

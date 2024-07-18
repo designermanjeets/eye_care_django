@@ -1,3 +1,4 @@
+# Stage 1: Build assets using Node.js
 FROM node:20.6.1-bookworm-slim AS assets
 LABEL maintainer="Nick Janetakis <nick.janetakis@gmail.com>"
 
@@ -7,7 +8,7 @@ ARG UID=1000
 ARG GID=1000
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends build-essential \
+  && apt-get install -y --no-install-recommends build-essential git \
   && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man \
   && apt-get clean \
   && groupmod -g "${GID}" node && usermod -u "${UID}" -g "${GID}" node \
@@ -31,8 +32,7 @@ RUN if [ "${NODE_ENV}" != "development" ]; then \
 
 CMD ["bash"]
 
-###############################################################################
-
+# Stage 2: Setup Python environment
 FROM python:3.12.4-slim-bookworm AS app
 LABEL maintainer="Nick Janetakis <nick.janetakis@gmail.com>"
 
@@ -42,7 +42,7 @@ ARG UID=1000
 ARG GID=1000
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends build-essential curl libpq-dev \
+  && apt-get install -y --no-install-recommends build-essential curl libpq-dev git \
   && rm -rf /var/lib/apt/lists/* /usr/share/doc /usr/share/man \
   && apt-get clean \
   && groupadd -g "${GID}" python \
