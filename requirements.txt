@@ -45,7 +45,7 @@ multidict>=6.0.2
 mypy-extensions==1.0.0
 networkx>=2.8
 numpy>=1.21.0
-openai==0.28
+openai==1.35.0
 orjson>=3.0.0
 packaging>=21.3
 # git+https://github.com/huggingface/peft.git@v0.3.0
