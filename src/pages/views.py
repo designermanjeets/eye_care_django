@@ -16,7 +16,6 @@ from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from langchain.chat_models import ChatOpenAI
 from openai import OpenAI
-client = OpenAI()
 
 import json
 
@@ -26,6 +25,8 @@ load_dotenv()
 # Initialize the OpenAI client
 open_api_key = os.getenv("OPENAI_API_KEY")
 os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+
+client = OpenAI(api_key=open_api_key)
 
 import torch
 
