@@ -6,9 +6,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
 import openai
 from pydantic import BaseModel, Field
 from langchain.chains import LLMChain
@@ -16,26 +13,18 @@ from langchain.prompts import PromptTemplate
 from langchain.output_parsers import PydanticOutputParser
 from langchain.chat_models import ChatOpenAI
 from openai import OpenAI
+import time
 
 import json
+import requests
 
 from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize the OpenAI client
-open_api_key = 'sk-proj-mAXZZZDvVxXGzfCTRyzWT3BlbkFJ4E6evgW1CIkgbO68muqz'
-os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+open_api_key = os.getenv("OPENAI_API_KEY")
 
 client = OpenAI(api_key=open_api_key)
-
-import torch
-
-from .model_loader import get_model_and_tokenizer
-base_model, tokenizer, device = get_model_and_tokenizer()
-
-# Detect the available device
-device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
-print(f"Using device: {device}")
 
 # Initialize the API credentials
 vendor_id = os.getenv("VendorId")
@@ -43,30 +32,39 @@ vendor_password = os.getenv("VendorPassword")
 account_id = os.getenv("AccountId")
 account_password = os.getenv("AccountPassword")
 
-# Load the base model and tokenizer
-# base_model_name = "NousResearch/Llama-2-7b-chat-hf"
-# tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-# base_model = AutoModelForCausalLM.from_pretrained(base_model_name, device_map='auto', torch_dtype=torch.float16)
-
 # Print the model structure for debugging
-# def print_model_structure(model):
-#     for name, module in model.named_modules():
-#         print(name)
-# print("Base model structure:")
-# print_model_structure(base_model)
+def print_model_structure(model):
+    for name, module in model.named_modules():
+        print(name)
+print("Base model structure:")
 
-# Load the fine-tuned adapter weights
-# parent = os.path.dirname(os.path.abspath(__file__))
-# adapter_path = f'{parent}/checkpoint-1070'
-# print(f"adapter_path: {adapter_path}")
-# print(f"Parent directory: {parent}")
-# try:
-#     base_model = PeftModel.from_pretrained(base_model, adapter_path)  # No .to(device)
-# except KeyError as e:
-#     print(f"KeyError encountered: {e}")
-#     print("Model structure at the time of error:")
-#     print_model_structure(base_model)
+# Define the function to call the Hugging Face endpoint
+def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_factor=0.3):
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "inputs": prompt,
+        "parameters": {
+            "max_length": 512,
+            "num_return_sequences": 1,
+        }
+    }
+    for attempt in range(retries):
+        try:
+            response = requests.post(api_url, headers=headers, json=data)
+            response.raise_for_status()
+            return response.json()[0]["generated_text"]
+        except requests.exceptions.RequestException as e:
+            if attempt < retries - 1:
+                sleep_time = backoff_factor * (2 ** attempt)
+                print(f"Retrying in {sleep_time} seconds...")
+                time.sleep(sleep_time)
+            else:
+                raise e
 
+# Function to identify intent
 def identify_intent(user_query):
     prompt = (
        f"""Identify the intent of the following query: "{user_query}".
@@ -84,7 +82,7 @@ def identify_intent(user_query):
     )
 
     # Extract the intent from the response
-    intent = chat_completion.choices[0].message['content'].strip().lower()
+    intent = chat_completion.choices[0].message.content.strip().lower()
     print(intent)
     return intent
 
@@ -235,23 +233,11 @@ def reschedule_appointment(auth_token, Lastname, DateOfBirth, IsActive="true"):
 
     return open_slots
 
-# Function to generate response using fine-tuned model
+# Function to generate response using Hugging Face endpoint
 def generate_response(prompt, max_length=512, num_return_sequences=1):
-    # Ensure the input is a string or a list of strings
-    if isinstance(prompt, str):
-        prompt = [prompt]
-    elif not isinstance(prompt, list) or not all(isinstance(item, str) for item in prompt):
-        raise ValueError("Input must be a string or a list of strings")
-    
-    inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to(device)
-    outputs = base_model.generate(
-        **inputs,
-        max_length=max_length,
-        num_return_sequences=num_return_sequences,
-        pad_token_id=tokenizer.eos_token_id
-    )
-    response = tokenizer.batch_decode(outputs, skip_special_tokens=True)
-    return response[0] if len(response) == 1 else response
+    api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"
+    api_token = os.getenv("HUGGINGFACE_API_TOKEN")
+    return call_huggingface_endpoint(prompt, api_url, api_token)
 
 # Function to handle missing information
 def ask_for_missing_info(request, required_info):
