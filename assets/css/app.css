@@ -7,6 +7,9 @@
 @import "tailwindcss/utilities";
 
 
+@import url(./style.bundle.css);
+
+
 #djDebugToolbarHandle {
     display: none;
 }
