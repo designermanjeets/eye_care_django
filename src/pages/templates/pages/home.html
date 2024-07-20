@@ -6,7 +6,7 @@
 {% block body %}
 
 <!--begin::Content-->
-<div class="flex-lg-row-fluid ms-lg-7 ms-xl-10 mt-10" style="max-height: 70vh;">
+<div class="flex-lg-row-fluid ms-lg-7 ms-xl-10 mt-10" style="max-height: 70vh; max-width: 90vw;">
   <!--begin::Messenger-->
   <div class="card" id="kt_chat_messenger">
     <!--begin::Card header-->
@@ -15,7 +15,7 @@
       <div class="card-title">
         <!--begin::User-->
         <div class="d-flex justify-content-center flex-column me-3">
-          <a href="#" class="fs-4 fw-bold text-gray-900 text-hover-primary me-1 mb-2 lh-1">Brian Cox</a>
+          <a href="#" class="fs-4 fw-bold text-gray-900 text-hover-primary me-1 mb-2 lh-1">Brian</a>
           <!--begin::Info-->
           <div class="mb-0 lh-1">
             <span class="badge badge-success badge-circle w-10px h-10px me-1"></span>
@@ -37,7 +37,7 @@
     </div>
     <!--end::Card header-->
     <!--begin::Card body-->
-    <div class="card-body" id="kt_chat_messenger_body" style="width: 70vh;">
+    <div class="card-body" id="kt_chat_messenger_body" style="width: 90vw; max-width: 70vh;">
       <!--begin::Messages-->
       <div class="scroll-y me-n5 pe-5 h-300px" data-kt-element="messages" data-kt-scroll="true"
         data-kt-scroll-activate="{default: false, lg: true}" data-kt-scroll-max-height="auto"
@@ -46,6 +46,7 @@
         <!-- Messages will be dynamically inserted here -->
       </div>
       <!--end::Messages-->
+      <div id="bot-typing" class="text-muted ms-3" style="display: none;">Brian is typing...</div>
     </div>
     <!--end::Card body-->
     <!--begin::Card footer-->
@@ -108,6 +109,10 @@
       e.preventDefault();
       var message = $('#chatbox').val();
       if (message.trim() !== '') {
+        // Disable the send button and show the bot typing indicator
+        $('#chat_submit').attr('disabled', true);
+        $('#bot-typing').show();
+
         $.ajax({
           type: 'POST',
           url: '/handle_user_query',
@@ -115,7 +120,7 @@
             'X-CSRFToken': csrftoken
           },
           data: JSON.stringify({
-              message: message
+              message: message,
           }),
           contentType: 'application/json; charset=utf-8',
           dataType: 'json',
@@ -162,9 +167,16 @@
             // Scroll to the bottom of the chat
             var chatBody = $('#kt_chat_messenger_body .scroll-y');
             chatBody.scrollTop(chatBody[0].scrollHeight);
+
+            // Re-enable the send button and hide the bot typing indicator
+            $('#chat_submit').attr('disabled', false);
+            $('#bot-typing').hide();
           },
           error: function (error) {
             console.log(error);
+            // Re-enable the send button and hide the bot typing indicator in case of error
+            $('#chat_submit').attr('disabled', false);
+            $('#bot-typing').hide();
           }
         });
       }
