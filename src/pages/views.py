@@ -296,7 +296,7 @@ def get_auth_token(vendor_id, vendor_password, account_id, account_password) -> 
         return "Failed to decode JSON response"
 
 def prefred_date_time_fun(response):
-  print("response12",response)
+  #print("response12",response)
   if "next" in response.lower() or "comming" in response.lower() or "upcomming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
         def get_next_weekday(day_name, use_next=False):
             # Dictionary to convert day names to weekday numbers
@@ -368,7 +368,7 @@ def prefred_date_time_fun(response):
   else:
     date_pattern = r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b'
     # Search for the pattern in the text
-    print("response",response)
+    
     try:
       match = re.search(date_pattern, response)
       # print("value in the date_time",match.groups())
@@ -474,13 +474,13 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
     result=''
     for idx, location in enumerate(locations):
         result+=f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})\n"
-        print(f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})")
+        #print(f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})")
     if request.session['book_appointment']=='True':  
        result=f" Choose a location by entering the ID: {result}"
        return result
     # location_id = transform_input(f"{request.session['book_appointment']}")
     location_id = request.session['book_appointment']
-    print(request.session['book_appointment'],'===============================',location_id)
+    #print(request.session['book_appointment'],'===============================',location_id)
 
     
     if location_id:
@@ -507,9 +507,9 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
     print("Available providers:")
     result=''
     for idx, provider in enumerate(providers):
-        print('----------',f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})")
+        #print('----------',f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})")
         result+=f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})\n"
-    print(request.session['provider_id'],'request.session["provider_id"]----------------')
+    #print(request.session['provider_id'],'request.session["provider_id"]----------------')
 
     if request.session['provider_id']=='True':  
        
@@ -539,7 +539,7 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
     print("Available reasons:")
     result=''
     for idx, reason in enumerate(reasons):
-        print(f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})")
+        #print(f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})")
         result+=f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})\n"
     if request.session['reason_id']=='True':  
        result=f" {transform_input('Choose a reason by entering the ID: ')} {result}"
@@ -572,10 +572,10 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
         request.session['slot_id']
     except:
         request.session['slot_id']='True'
-    print("Available open slots:")
+    #print("Available open slots:")
     result=''
     for idx, slot in enumerate(open_slots):
-        print(f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})")
+        #print(f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})")
         result+=f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})"
     if request.session['slot_id']=='True':  
        result=f" {transform_input('Choose an open slot by entering the ID:  ')} {result}"
@@ -609,7 +609,7 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
        result=f" {transform_input('Enter the OTP received: ')} "
        return result
     open_slot_id = request.session['slot_id']
-    print("open_slot_id",open_slot_id)
+    #print("open_slot_id",open_slot_id)
     otp = request.session['otp']
     # otp = input(transform_input("Enter the OTP received: "))
 
@@ -637,33 +637,33 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
     #     return "Invalid OTP. Please try again."
 
     # Step 7: Book the appointment
-    book_appointment_url = "https://iochatbot.maximeyes.com/api/appointment/onlinescheduling"
+    # book_appointment_url = "https://iochatbot.maximeyes.com/api/appointment/onlinescheduling"
     # Convert ApptDate to 'MM/DD/YYYY' format
   #  print()
     #appointment_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S").strftime("%m/%d/%Y")
-    parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
+    # parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
 
-    # Convert the datetime object to the desired format
-    appointment_date = parsed_date.strftime("%m/%d/%Y")
-    print(appointment_date)
-    book_appointment_payload = {
-        "OpenSlotId": open_slot_id,
-        "ApptDate": appointment_date,
-        "ReasonId": reason_id,
-        "FirstName": FirstName,
-        "LastName": LastName,
-        "PatientDob": DOB,
-        "MobileNumber": PhoneNumber,
-        "EmailId": Email}
-    print(book_appointment_payload,'book_appointment_payload')
-    try:
-        book_appointment_response = requests.post(book_appointment_url, json=book_appointment_payload, headers=headers)
-        book_appointment_response.raise_for_status()
-        return book_appointment_response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while booking the appointment: {e}")
-        if book_appointment_response.status_code != 200:
-            return f"Failed to book appointment. Status code: {book_appointment_response.status_code}"
+    # # Convert the datetime object to the desired format
+    # appointment_date = parsed_date.strftime("%m/%d/%Y")
+    # print(appointment_date)
+    # book_appointment_payload = {
+    #     "OpenSlotId": open_slot_id,
+    #     "ApptDate": appointment_date,
+    #     "ReasonId": reason_id,
+    #     "FirstName": FirstName,
+    #     "LastName": LastName,
+    #     "PatientDob": DOB,
+    #     "MobileNumber": PhoneNumber,
+    #     "EmailId": Email}
+    # print(book_appointment_payload,'book_appointment_payload')
+    # try:
+    #     book_appointment_response = requests.post(book_appointment_url, json=book_appointment_payload, headers=headers)
+    #     book_appointment_response.raise_for_status()
+    #     return book_appointment_response.json()
+    # except requests.exceptions.RequestException as e:
+    #     print(f"An error occurred while booking the appointment: {e}")
+    #     if book_appointment_response.status_code != 200:
+    #         return f"Failed to book appointment. Status code: {book_appointment_response.status_code}"
 
     return "Appointment scheduled successfully."
 
@@ -710,7 +710,7 @@ def handle_user_query1(request,user_query):
      
       while missing_fields or len(missing_fields)==0:
         while missing_fields:
-            print("missing fileds in userhandel",missing_fields)
+            #print("missing fileds in userhandel",missing_fields)
             prompt = f"Please provide your {missing_fields}: " 
             user_response = transform_input(prompt)
             additional_info = fetch_info_openai(user_response)
@@ -875,7 +875,7 @@ def func(request):
 def func1(request):
     data = json.loads(request.body.decode('utf-8'))
     message = data.get('input', '')
-    print(message,'----------------')
+    #print(message,'----------------')
     return JsonResponse({"response": 'success'})
 
 @csrf_exempt
