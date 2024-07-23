@@ -609,6 +609,7 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
        result=f" {transform_input('Enter the OTP received: ')} "
        return result
     open_slot_id = request.session['slot_id']
+    print("open_slot_id",open_slot_id)
     otp = request.session['otp']
     # otp = input(transform_input("Enter the OTP received: "))
 
@@ -617,21 +618,21 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
 
     #otp velidation
 
-    # validate_otp_payload = otp_payload.copy()
-    # validate_otp_payload["OTP"] = otp
-    # try:
-    #     validate_otp_response = requests.post(validate_otp_url, json=validate_otp_payload, headers=headers)
-    #     validate_otp_response.raise_for_status()
-    #     print(validate_otp_response)
-    # except requests.exceptions.RequestException as e:
-    #     print(f"An error occurred while validating OTP: {e}")
-    #     return
-    # if validate_otp_response.status_code != 200:
-    #     return f"Failed to validate OTP. Status code: {validate_otp_response.status_code}"
-    # try:
-    #     validation_result = validate_otp_response.json()
-    # except ValueError:
-    #     return "Failed to parse OTP validation response as JSON."
+    validate_otp_payload = otp_payload.copy()
+    validate_otp_payload["OTP"] = otp
+    try:
+        validate_otp_response = requests.post(validate_otp_url, json=validate_otp_payload, headers=headers)
+        validate_otp_response.raise_for_status()
+        print(validate_otp_response)
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while validating OTP: {e}")
+        return
+    if validate_otp_response.status_code != 200:
+        return f"Failed to validate OTP. Status code: {validate_otp_response.status_code}"
+    try:
+        validation_result = validate_otp_response.json()
+    except ValueError:
+        return "Failed to parse OTP validation response as JSON."
     # if not validation_result.get("Isvalidated"):
     #     return "Invalid OTP. Please try again."
 
@@ -654,7 +655,7 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
         "PatientDob": DOB,
         "MobileNumber": PhoneNumber,
         "EmailId": Email}
-
+    print(book_appointment_payload,'book_appointment_payload')
     try:
         book_appointment_response = requests.post(book_appointment_url, json=book_appointment_payload, headers=headers)
         book_appointment_response.raise_for_status()
