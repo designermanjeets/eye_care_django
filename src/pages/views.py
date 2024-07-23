@@ -152,6 +152,7 @@ def identify_intent(user_query):
     )
     # Extract the intent from the response
     intent = chat_completion.choices[0].message.content.strip()
+    print(intent,'intent')
     return intent
 
 
@@ -833,6 +834,8 @@ def home(request):
         except:
             pass
     return render(request, "pages/home.html", context)
+
+@csrf_exempt
 def func(request):
     resp=''
     
@@ -887,7 +890,6 @@ def handle_user_query(request):
     except:
         message=''
     if request.method != 'POST':
-        
         return JsonResponse({"error": "Invalid request method"}, status=405)
     try:
         request.session['context']= request.session['context'] +' '+message
