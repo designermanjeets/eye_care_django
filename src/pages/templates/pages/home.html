@@ -112,21 +112,8 @@
         // Disable the send button and show the bot typing indicator
         $('#chat_submit').attr('disabled', true);
         $('#bot-typing').show();
-
-        $.ajax({
-          type: 'POST',
-          url: '/handle_jquery_response',
-          headers: {
-            'X-CSRFToken': csrftoken
-          },
-          data: JSON.stringify({
-              input: message,
-          }),
-          contentType: 'application/json; charset=utf-8',
-          dataType: 'json',
-          success: function (response) {
-            // Append user's message to the chat window
-            $('#kt_chat_messenger_body .scroll-y').append(`
+         // Append user's message to the chat window
+        $('#kt_chat_messenger_body .scroll-y').append(`
               <div class="d-flex justify-content-end mb-10">
                 <div class="d-flex flex-column align-items-end">
                   <div class="d-flex align-items-center mb-2">
@@ -143,7 +130,25 @@
                 </div>
               </div>
             `);
+
+            var scrollElement = $('#kt_chat_messenger_body .scroll-y');
+            scrollElement.scrollTop(scrollElement.prop('scrollHeight'));
+
             $('#chatbox').val(''); // Clear the input box
+        $.ajax({
+          type: 'POST',
+          url: '/handle_jquery_response',
+          headers: {
+            'X-CSRFToken': csrftoken
+          },
+          data: JSON.stringify({
+              input: message,
+          }),
+          contentType: 'application/json; charset=utf-8',
+          dataType: 'json',
+          success: function (response) {
+           
+            
 
             // Append bot's response to the chat window
             $('#kt_chat_messenger_body .scroll-y').append(`
