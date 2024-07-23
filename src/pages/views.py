@@ -139,21 +139,40 @@ def fetch_info_openai(response):
 def identify_intent(user_query):
     prompt = (
         f"""Identify the intent of the following query: "{user_query}".
-        Is it related to book an appointment, rescheduling an appointment, canceling an appointment, or something else?  and also check the appointment date and time """
+        Is it related to book an appointment, rescheduling an appointment, canceling an appointment, or something else? And also check the appointment date and time """
     )
-    chat_completion = client.chat.completions.create(
-      model="gpt-3.5-turbo",
-      messages=[
-          {
-              "role": "user",
-              "content": prompt,
-          }
-      ]
-    )
-    # Extract the intent from the response
-    intent = chat_completion.choices[0].message.content.strip()
-    print(intent,'intent')
-    return intent
+    print("prompt", prompt)
+
+    retries = 3
+    backoff_factor = 0.3
+
+    for attempt in range(retries):
+        try:
+            chat_completion = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ]
+            )
+            # Extract the intent from the response
+            intent = chat_completion.choices[0].message.content.strip()
+            print("intent", intent)
+            return intent
+        except requests.exceptions.RequestException as e:
+            if attempt < retries - 1:
+                sleep_time = backoff_factor * (2 ** attempt)
+                print(f"Connection error occurred: {e}. Retrying in {sleep_time} seconds...")
+                time.sleep(sleep_time)
+            else:
+                print(f"Failed after {retries} attempts: {e}")
+                return "Error: Unable to identify intent due to a connection error."
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
+            return "Error: An unexpected error occurred while identifying intent."
+
 
 
 def validation_check(user_query):
@@ -834,7 +853,7 @@ def home(request):
         except:
             pass
     return render(request, "pages/home.html", context)
-
+    
 @csrf_exempt
 def func(request):
     resp=''
