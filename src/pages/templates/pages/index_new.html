@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simple Chat Interface</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    padding: 20px;
+  }
+  .chatbox {
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 10px;
+    width: 300px;
+    margin: 0 auto;
+  }
+  .messages {
+    height: 200px;
+    overflow-y: scroll;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+  }
+  .input-container {
+    display: flex;
+  }
+  .message-input {
+    flex: 1;
+    padding: 5px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    margin-right: 5px;
+  }
+  .send-button {
+    padding: 5px 15px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="chatbox">
+    <div class="messages" id="messages">
+      {{resp}}
+    </div>
+    <form method="post">
+      {%csrf_token%}
+    <div class="input-container">
+      <input type="text" name="input" id="messageInput" class="message-input" placeholder="Type your message...">
+      <!-- <button onclick="sendMessage()"class="send-button">Send</button>  -->
+      <button class="send-button" >Send</button> 
+    </div>
+    </form>
+  </div>
+
+  <script>
+    function sendMessage() {
+      var messageInput = document.getElementById('messageInput');
+      var message = messageInput.value.trim();
+
+      if (message !== '') {
+        var messagesContainer = document.getElementById('messages');
+        var messageElement = document.createElement('div');
+        messageElement.textContent = message;
+        messagesContainer.appendChild(messageElement);
+
+        // Clear input after sending message
+        messageInput.value = '';
+        // Optionally, you can scroll to the bottom of the chat box
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    }
+  </script>
+</body>
+</html>

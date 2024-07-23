@@ -115,12 +115,12 @@
 
         $.ajax({
           type: 'POST',
-          url: '/handle_user_query',
+          url: '/handle_jquery_response',
           headers: {
             'X-CSRFToken': csrftoken
           },
           data: JSON.stringify({
-              message: message,
+              input: message,
           }),
           contentType: 'application/json; charset=utf-8',
           dataType: 'json',
@@ -135,7 +135,7 @@
                       <a href="#" class="fs-5 fw-bold text-gray-900 text-hover-primary ms-1">You</a>
                     </div>
                     <div class="symbol symbol-35px symbol-circle">
-                      <img alt="Pic" src="{% static 'images/avatars/300-1.jpg' %}" />
+                      <img alt="Pic" src="{% static 'static/images/avatars/300-1.jpg' %}" />
                     </div>
                   </div>
                   <div class="p-5 rounded bg-light-primary text-dark fw-semibold mw-lg-400px text-end"
@@ -151,7 +151,7 @@
                 <div class="d-flex flex-column align-items-start">
                   <div class="d-flex align-items-center mb-2">
                     <div class="symbol symbol-35px symbol-circle">
-                      <img alt="Pic" src="{% static 'images/avatars/300-25.jpg' %}" />
+                      <img alt="Pic" src="{% static 'static/images/avatars/300-25.jpg' %}" />
                     </div>
                     <div class="ms-3">
                       <a href="#" class="fs-5 fw-bold text-gray-900 text-hover-primary me-1">Bot</a>

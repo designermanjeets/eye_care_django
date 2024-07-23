@@ -85,16 +85,16 @@ services:
       - "${DOCKER_WEB_PORT_FORWARD:-127.0.0.1:8000}:${PORT:-8000}"
     profiles: ["web"]
 
-  worker:
-    <<: *default-app
-    command: celery -A config worker -l "${CELERY_LOG_LEVEL:-info}"
-    entrypoint: []
-    deploy:
-      resources:
-        limits:
-          cpus: "${DOCKER_WORKER_CPUS:-0}"
-          memory: "${DOCKER_WORKER_MEMORY:-0}"
-    profiles: ["worker"]
+  # worker:
+  #   <<: *default-app
+  #   command: celery -A config worker -l "${CELERY_LOG_LEVEL:-info}"
+  #   entrypoint: []
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "${DOCKER_WORKER_CPUS:-0}"
+  #         memory: "${DOCKER_WORKER_MEMORY:-0}"
+  #   profiles: ["worker"]
 
   js:
     <<: *default-assets

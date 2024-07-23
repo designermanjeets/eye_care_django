@@ -55,6 +55,10 @@ USER python
 COPY --chown=python:python requirements*.txt ./
 COPY --chown=python:python bin/ ./bin
 
+# Set permissions on the bin directory and install dependencies
+RUN chmod +x /app/bin/pip3-install \
+    && /app/bin/pip3-install
+
 RUN chmod 0755 bin/* && bin/pip3-install
 
 ARG DEBUG="false"

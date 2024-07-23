@@ -24,7 +24,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ["SECRET_KEY"]
 
-DEBUG = bool(strtobool(os.getenv("DEBUG", "false")))
+DEBUG = True
+# DEBUG = bool(strtobool(os.getenv("DEBUG", "false")))
 
 TESTING = "test" in sys.argv
 
@@ -165,9 +166,15 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 STATIC_URL = "/static/"
-STATICFILES_DIRS = ["/public", os.path.join(BASE_DIR, "..", "public")]
-STATIC_ROOT = "/public_collected"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+    "/var/www/static/",
+]
+
+
+# STATICFILES_DIRS = ["/public", os.path.join(BASE_DIR, "..", "public")]
+# STATIC_ROOT = "/public_collected"
+# STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Django Debug Toolbar
 # https://django-debug-toolbar.readthedocs.io/
