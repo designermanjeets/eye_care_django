@@ -173,7 +173,39 @@ def identify_intent(user_query):
             print(f"An unexpected error occurred: {e}")
             return "Error: An unexpected error occurred while identifying intent."
 
+def identify_intent_practice_question(user_query):
+    prompt = (
+        f"""Identify the intent of this query :  "{user_query}".
+        and if it is asking for an address, email , or work timimg  or name reply me i single words only as address for address, name for name, email for email, hours for work timing or working hours or simillar
+        and if intentent is not frome abouve given then return the intent as other"""
+        
+    )
+    chat_completion = client.chat.completions.create(
+      model="gpt-3.5-turbo",
+      messages=[
+          {
+              "role": "user",
+              "content": prompt,
+          }
+      ]
+    )
+    intent = chat_completion.choices[0].message.content.strip()
+    return intent
 
+# def validation_check(user_query):
+#     prompt = (
+#         f"""Identify the user input: "{user_query}".
+#         its related to user repose its validate the data is correct or not correct  if correct and return True and if not correct then return False"""
+#     )
+#     chat_completion = client.chat.completions.create(
+#       model="gpt-3.5-turbo",
+#       messages=[
+#           {
+#               "role": "user",
+#               "content": prompt,
+#           }
+#       ]
+#     )
 
 def validation_check(user_query):
     prompt = (
@@ -315,7 +347,7 @@ def get_auth_token(vendor_id, vendor_password, account_id, account_password) -> 
     except json.JSONDecodeError:
         return "Failed to decode JSON response"
 
-def prefred_date_time_fun(response):
+def prefred_date_time_fun1(response):
   #print("response12",response)
   if "next" in response.lower() or "comming" in response.lower() or "upcomming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
         def get_next_weekday(day_name, use_next=False):
@@ -461,9 +493,142 @@ def prefred_date_time_fun(response):
       else:
         return None
 
-
+def prefred_date_time_fun(response):
+  #print("response12",response)
+  if "next" in response.lower() or "comming" in response.lower() or "upcomming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
+        def get_next_weekday(day_name, use_next=False):
+            # Dictionary to convert day names to weekday numbers
+            days_of_week = {
+                'monday': 0,
+                'tuesday': 1,
+                'wednesday': 2,
+                'thursday': 3,
+                'friday': 4,
+                'saturday': 5,
+                'sunday': 6
+            }
+ 
+            # Get today's date and the current weekday
+            today = datetime.now()
+            current_weekday = today.weekday()
+ 
+            # Convert the day name to a weekday number
+            target_weekday = days_of_week[day_name.lower()]
+ 
+            # Calculate the number of days until the next target weekday
+            days_until_target = (target_weekday - current_weekday + 7) % 7
+            if days_until_target == 0 or use_next:
+                days_until_target += 7
+ 
+            # Calculate the date for the next target weekday
+            next_weekday = today + timedelta(days=days_until_target)
+ 
+            return next_weekday
+ 
+        def get_relative_day(keyword):
+            today = datetime.now()
+            if keyword == "tomorrow":
+                return today + timedelta(days=1)
+            elif keyword == "day after tomorrow":
+                return today + timedelta(days=2)
+            return None
+ 
+        keywords = ["next", "coming", "upcoming", "tomorrow", "day after tomorrow"]
+        use_next = any(keyword in response for keyword in ["next", "coming", "upcoming"])
+ 
+        # Check for "tomorrow" and "day after tomorrow"
+        relative_day = None
+        for keyword in ["tomorrow", "day after tomorrow"]:
+            if keyword in response:
+                relative_day = get_relative_day(keyword)
+                response = response.replace(keyword, "").strip()
+                break
+ 
+        if relative_day:
+            if response:
+                # If there's a specific day mentioned, calculate from the relative day
+                next_day = get_next_weekday(response)
+                if next_day <= relative_day:
+                    next_day += timedelta(days=7)
+                return (next_day.strftime("%Y-%m-%dT%H:%M:%S"))
+            else:
+                return (relative_day.strftime("%Y-%m-%dT%H:%M:%S"))
+        else:
+            # Remove the keyword from the input if it exists
+            for keyword in ["next", "coming", "upcoming"]:
+                response = response.replace(keyword, "").strip()
+ 
+            # Get the next occurrence of the specified day
+            next_day = get_next_weekday(response, use_next)
+            return next_day.strftime("%Y-%m-%dT%H:%M:%S")
+  
+  else:
+    patterns = [
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b', '%B %d, %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})\b', '%B %d, %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})\b', '%B %d %Y'),
+        (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4}), (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
+        (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})\b', '%d %B %Y'),
+        (r'\b(\d{1,2}) (AM|PM)\b', None),
+        (r'\b(Morning|Afternoon|Evening|Night)\b', None),
+        (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m/%d/%Y'),
+        (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m-%d-%Y'),
+        (r'\b(\d{4})-(\d{2})-(\d{1,2})\b', '%Y-%m-%d'),
+        (r'\b(\d{2})/(\d{1,2})/(\d{4})\b', '%m/%d/%Y'),
+        (r'\b(\d{4})/(\d{2})/(\d{1,2})\b', '%Y/%m/%d'),
+    ]
+ 
+    # Time mappings for periods of the day
+    time_mappings = {
+        "Morning": 9,
+        "Afternoon": 15,
+        "Evening": 18,
+        "Night": 21
+    }
+   
+    datetime_obj = None
+ 
+    for pattern, date_format in patterns:
+        match = re.search(pattern, response)
+        if match:
+            groups = match.groups()
+            if date_format:
+                date_str = ' '.join(groups[:3])
+                datetime_obj = datetime.strptime(date_str, date_format)
+                if len(groups) == 4:  # If there's a time of day
+                    period = groups[3]
+                    hour = time_mappings.get(period, 12)
+                    datetime_obj = datetime_obj.replace(hour=hour)
+                break
+            else:
+                if len(groups) == 2 and groups[1] in ["AM", "PM"]:
+                    hour, am_pm = groups
+                    hour = int(hour)
+                    if am_pm == 'PM' and hour != 12:
+                        hour += 12
+                    elif am_pm == 'AM' and hour == 12:
+                        hour = 0
+                    if datetime_obj:
+                        datetime_obj = datetime_obj.replace(hour=hour)
+                    else:
+                        datetime_obj = datetime.combine(datetime.date.today(), datetime.time(hour=hour))
+                elif len(groups) == 1 and groups[0] in time_mappings:
+                    period = groups[0]
+                    hour = time_mappings[period]
+                    if datetime_obj:
+                        datetime_obj = datetime_obj.replace(hour=hour)
+                    else:
+                        datetime_obj = datetime.combine(datetime.date.today(), datetime.time(hour=hour))
+            break
+   
+    if not datetime_obj:
+        raise ValueError("No valid date format found in the response")
+ 
+    return datetime_obj.isoformat()
+ 
 # Tool to book appointment
-def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
+def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
     try:
         request.session['book_appointment']
     except:
@@ -535,6 +700,7 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
        
        result=f" {transform_input('Choose a provider by entering the ID: ')} {result}"
        return result
+    
     # provider_id = input(transform_input("Choose a provider by entering the ID: "))
     provider_id = request.session['provider_id']
 
@@ -653,6 +819,8 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
         validation_result = validate_otp_response.json()
     except ValueError:
         return "Failed to parse OTP validation response as JSON."
+    
+
     # if not validation_result.get("Isvalidated"):
     #     return "Invalid OTP. Please try again."
 
@@ -687,6 +855,271 @@ def book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, 
 
     return "Appointment scheduled successfully."
 
+def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber, Email, prefred_date_time):
+    try:
+        request.session['book_appointment']
+    except:
+        request.session['book_appointment'] = 'True'
+ 
+    headers = {
+        'Content-Type': 'application/json',
+        'apiKey': f'bearer {auth_token}'}
+ 
+    # Step 1: Get the list of locations
+    get_locations_url = "https://iochatbot.maximeyes.com/api/location/GetLocationsChatBot"
+    try:
+        locations_response = requests.get(get_locations_url, headers=headers)
+        locations_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while fetching locations: {e}")
+        return
+    if locations_response.status_code != 200:
+        return f"Failed to get locations. Status code: {locations_response.status_code}"
+    try:
+        locations = locations_response.json()
+    except ValueError:
+        return "Failed to parse locations response as JSON."
+ 
+    print("Available locations:")
+    result = ''
+    for idx, location in enumerate(locations):
+        result += f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})\n"
+    if request.session['book_appointment'] == 'True':
+        result = f"Choose a location by entering the ID: {result}"
+        return result
+    location_id = request.session['book_appointment']
+    
+    if location_id:
+        print("Thanks for providing location")
+   
+    # Step 2: Get the list of providers for the selected location
+    get_providers_url = f"https://iochatbot.maximeyes.com/api/scheduledresource/GetScheduledResourcesChatBot?LocationId={location_id}"
+    try:
+        providers_response = requests.get(get_providers_url, headers=headers)
+        providers_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while fetching providers: {e}")
+        return
+    if providers_response.status_code != 200:
+        return f"Failed to get providers. Status code: {providers_response.status_code}"
+    try:
+        providers = providers_response.json()
+    except ValueError:
+        return "Failed to parse providers response as JSON."
+    try:
+        print(request.session['provider_id'], '-----------------------------')
+    except:
+        request.session['provider_id'] = 'True'
+   
+    print("Available providers:")
+    result = ''
+    for idx, provider in enumerate(providers):
+        result += f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})\n"
+    if request.session['provider_id'] == 'True':
+        result = f"Choose a provider by entering the ID: {result}"
+        return result
+    provider_id = request.session['provider_id']
+ 
+    # Step 3: Get the appointment reasons for the selected provider and location
+    get_reasons_url = f"https://iochatbot.maximeyes.com/api/appointment/appointmentreasonsForChatBot?LocationId={location_id}&SCHEDULE_RESOURCE_ID={provider_id}"
+    try:
+        reasons_response = requests.get(get_reasons_url, headers=headers)
+        reasons_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while fetching appointment reasons: {e}")
+        return
+    if reasons_response.status_code != 200:
+        return f"Failed to get appointment reasons. Status code: {reasons_response.status_code}"
+    try:
+        reasons = reasons_response.json()
+    except ValueError:
+        return "Failed to parse appointment reasons response as JSON."
+    try:
+        request.session['reason_id']
+    except:
+        request.session['reason_id'] = 'True'
+    print("Available reasons:")
+    result = ''
+    for idx, reason in enumerate(reasons):
+        result += f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})\n"
+    if request.session['reason_id'] == 'True':
+        result = f"Choose a reason by entering the ID: {result}"
+        return result
+ 
+    reason_id = request.session['reason_id']
+ 
+    # Step 4: Get the open slots for the selected location, provider, and reason
+    preferred = prefred_date_time_fun(prefred_date_time)
+    print("Preferred date time", preferred)
+ 
+    from_date = preferred
+    print("From date", from_date)
+    get_open_slots_url = f"https://iochatbot.maximeyes.com/api/appointment/openslotforchatbot?fromDate={from_date}&isOpenSlotsOnly=true"
+    try:
+        open_slots_response = requests.get(get_open_slots_url, headers=headers)
+        open_slots_response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"An error occurred while fetching open slots: {e}")
+        return
+    if open_slots_response.status_code != 200:
+        return f"Failed to get open slots. Status code: {open_slots_response.status_code}"
+    try:
+        open_slots = open_slots_response.json()
+    except ValueError:
+        return "Failed to parse open slots response as JSON."
+    try:
+        request.session['slot_id']
+    except:
+        request.session['slot_id'] = 'True'
+    print("Available open slots:")
+    result = ''
+    for idx, slot in enumerate(open_slots):
+        result += f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})\n"
+    if request.session['slot_id'] == 'True':
+        result = f"Choose an open slot by entering the ID: {result}"
+        return result
+    open_slot_id = request.session['slot_id']
+ 
+    # Step 5: Confirm details with the user
+   
+    confirmation_message = (
+        f"Here are the details of your appointment:\n"
+        f"Location ID: {location_id}\n"
+        f"Provider ID: {provider_id}\n"
+        f"Reason ID: {reason_id}\n"
+        f"Preferred Slot ID: {open_slot_id}\n"
+        f"Date and Time: {from_date}\n"
+        f"Name: {FirstName} {LastName}\n"
+        f"DOB: {DOB}\n"
+        f"Phone: {PhoneNumber}\n"
+        f"Email: {Email}\n"
+        f"Is this information correct? (yes/no)"
+    )
+
+
+    try:
+        request.session['confirmation']
+    except:
+        request.session['confirmation'] = 'True'
+    
+    if request.session['confirmation'] == "True":
+        return confirmation_message
+    
+    # Step 6: If user confirms, send OTP
+    # Only after user confirms, proceed with OTP
+
+
+
+    if request.session['confirmation'] == 'yes':
+        send_otp_url = "https://iochatbot.maximeyes.com/api/common/sendotp"
+        otp_payload = {
+            "FirstName": FirstName,
+            "LastName": LastName,
+            "DOB": DOB,
+            "PhoneNumber": PhoneNumber,
+            "Email": Email
+        }
+        try:
+            otp_response = requests.post(send_otp_url, json=otp_payload, headers=headers)
+            otp_response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred while sending OTP: {e}")
+            return
+        if otp_response.status_code != 200:
+            return f"Failed to send OTP. Status code: {otp_response.status_code}"
+ 
+        try:
+            request.session['otp']
+        except:
+            request.session['otp'] = 'True'
+        result = ''
+        if request.session['otp'] == 'True':
+            result = f"Enter the OTP received: "
+            return result
+        otp = request.session['otp']
+ 
+        # Step 7: Validate OTP
+        validate_otp_url = "https://iochatbot.maximeyes.com/api/common/checkotp"
+ 
+        validate_otp_payload = otp_payload.copy()
+        validate_otp_payload["OTP"] = otp
+        try:
+            validate_otp_response = requests.post(validate_otp_url, json=validate_otp_payload, headers=headers)
+            validate_otp_response.raise_for_status()
+            print(validate_otp_response)
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred while validating OTP: {e}")
+            return
+        if validate_otp_response.status_code != 200:
+            return f"Failed to validate OTP. Status code: {validate_otp_response.status_code}"
+        try:
+            validation_result = validate_otp_response.json()
+        except ValueError:
+            return "Failed to parse OTP validation response as JSON."
+        # if not validation_result.get("Isvalidated"):
+        #     return "Invalid OTP. Please try again."
+ 
+        # Step 8: Book the appointment
+        # book_appointment_url = "https://iochatbot.maximeyes.com/api/appointment/onlinescheduling"
+        # book_appointment_payload = {
+        #     "OpenSlotId": open_slot_id,
+        #     "ApptDate": from_date,
+        #     "ReasonId": reason_id,
+        #     "FirstName": FirstName,
+        #     "LastName": LastName,
+        #     "PatientDob": DOB,
+        #     "MobileNumber": PhoneNumber,
+        #     "EmailId": Email
+        # }
+        # try:
+        #     book_appointment_response = requests.post(book_appointment_url, json=book_appointment_payload, headers=headers)
+        #     book_appointment_response.raise_for_status()
+        #     return book_appointment_response.json()
+        # except requests.exceptions.RequestException as e:
+        #     print(f"An error occurred while booking the appointment: {e}")
+        #     return f"Failed to book appointment. Status code: {book_appointment_response.status_code}"
+    elif request.session['confirmation'] == 'no':
+
+        pass
+
+    
+    # if not validation_result.get("Isvalidated"):
+    #     return "Invalid OTP. Please try again."
+
+    # Step 7: Book the appointment
+    # book_appointment_url = "https://iochatbot.maximeyes.com/api/appointment/onlinescheduling"
+    # Convert ApptDate to 'MM/DD/YYYY' format
+  #  print()
+    #appointment_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S").strftime("%m/%d/%Y")
+    # parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
+
+    # # Convert the datetime object to the desired format
+    # appointment_date = parsed_date.strftime("%m/%d/%Y")
+    # print(appointment_date)
+    # book_appointment_payload = {
+    #     "OpenSlotId": open_slot_id,
+    #     "ApptDate": appointment_date,
+    #     "ReasonId": reason_id,
+    #     "FirstName": FirstName,
+    #     "LastName": LastName,
+    #     "PatientDob": DOB,
+    #     "MobileNumber": PhoneNumber,
+    #     "EmailId": Email}
+    # print(book_appointment_payload,'book_appointment_payload')
+    # try:
+    #     book_appointment_response = requests.post(book_appointment_url, json=book_appointment_payload, headers=headers)
+    #     book_appointment_response.raise_for_status()
+    #     return book_appointment_response.json()
+    # except requests.exceptions.RequestException as e:
+    #     print(f"An error occurred while booking the appointment: {e}")
+    #     if book_appointment_response.status_code != 200:
+    #         return f"Failed to book appointment. Status code: {book_appointment_response.status_code}"
+    
+    
+    
+    return "Appointment scheduled successfully."
+
+
 # Function to generate response using Hugging Face endpoint
 def generate_response(prompt, max_length=512, num_return_sequences=1):
     api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"
@@ -702,24 +1135,78 @@ def update_field(extracted_info, field, value):
     if value and value.lower() != "none":
         extracted_info[field] = value
     return extracted_info
-
+def validate_email(email):
+          # Regular expression pattern for a valid email address
+          pattern = r'^[\w\.-]+@[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$'
+          return re.match(pattern, email) is not None
+def validate_phone(phone):
+    # Regular expression pattern for a valid US phone number
+    pattern = r'^\d{10}$'
+    return re.match(pattern, phone) is not None
 def handle_user_query1(request,user_query):
     # Identify the user's intent
     print("user_query:", user_query)
+
+    intent = identify_intent_practice_question(user_query)
+    if intent != 'other':
+        if 'address' in intent:
+            prompt = f"Please provide your a valid Email address the email you provided is not valid" 
+            user_response = transform_input(prompt)
+        
+
+        return intent
+
     intent = identify_intent(user_query)
+    
+    
+    
     print(f"Identified intent: {intent}")
 
     # If the intent is to book an appointment
     if "booking an appointment" in intent.lower() or "schedule appointment" in intent.lower() or "book" in intent.lower():
       extracted_info = fetch_info_openai(user_query)
       print(f"Extracted info: {extracted_info}")
-
-
+      
       fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email','Preferred date or time']
       # missing_fields = [field for field in fields if not extracted_info.get(field)]
-
+      
       missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
       print("missing fields",missing_fields)
+      
+      
+     
+      fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email','Preferred date or time']  
+      if 'Email' not in missing_fields:
+        extracted_email=extracted_info['Email']
+            
+        try:
+            if extracted_email != "" or extracted_email != "none":
+                if validate_email(extracted_email)==False:
+                    prompt = f"Please provide your a valid Email address the email you provided is not valid" 
+                    user_response = transform_input(prompt)
+                    # user_response="Please provide your a valid Email address the email you provided is not valid" 
+                    message=request.session['context']
+                    message=message.replace('extracted_email','')
+                    request.session['context']=message
+                    return user_response   
+        except:
+            pass
+      if 'PhoneNumber' not in missing_fields:
+        extracted_PhoneNumber=extracted_info['PhoneNumber']
+
+        try:
+            if extracted_PhoneNumber != "" or extracted_PhoneNumber != "none":
+                if validate_phone(extracted_PhoneNumber)==False:
+                    prompt = f"Please provide your a valid Phone Number the one you provided is not valid" 
+                    user_response = transform_input(prompt)
+                    message=request.session['context']
+                    message=message.replace('extracted_PhoneNumber','')
+                    request.session['context']=message
+                    # user_response="Please provide your a valid Phone Number the one you provided is not valid" 
+                    return user_response   
+        except:
+            pass
+      
       if missing_fields:
 
         prompt = f"Please provide your {missing_fields}: " 
@@ -776,8 +1263,25 @@ def handle_user_query1(request,user_query):
         
         book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
         
-        return book_appt
+        try:
+            if 'Appointment scheduled successfully' in book_appt:
+                try:
+                    del request.session['context']
+                    del request.session['book_appointment']
+                    del request.session['provider_id']
+                    del request.session['reason_id']
+                    del request.session['slot_id']
+                    del request.session['otp']
+                    del request.session['return_response']
+                    del request.session['confirmation']
+                except:
+                    pass
+        except:
+            pass
 
+
+        return book_appt
+    
   #If the intent is not related to booking, generate a response using the fine-tuned model
     else:
         response = generate_response(user_query)
@@ -850,6 +1354,7 @@ def home(request):
             del request.session['slot_id']
             del request.session['otp']
             del request.session['return_response']
+            del request.session['confirmation']
         except:
             pass
     return render(request, "pages/home.html", context)
@@ -889,6 +1394,11 @@ def func(request):
                 request.session['otp']=message
             except:
                 print('Not able select otp')
+        if  request.session.get('confirmation')=='True':
+            try:
+                request.session['confirmation']=message
+            except:
+                print('Not able to confirm')
         resp=str(handle_user_query(request))
        
     # return render(request, "pages/home.html",{'resp':resp,'return_response':return_response})
