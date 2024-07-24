@@ -176,7 +176,7 @@ def identify_intent(user_query):
 def identify_intent_practice_question(user_query):
     prompt = (
         f"""Identify the intent of this query :  "{user_query}".
-        and if it is asking for an address, email , or work timimg  or name reply me i single words only as address for address, name for name, email for email, hours for work timing or working hours or simillar
+        and if it is asking for an address, email , or work timimg  or name reply me in a single word only as address for address, name for name, email for email, hours for work timing or working hours or simillar
         and if intentent is not frome abouve given then return the intent as other"""
         
     )
@@ -190,22 +190,49 @@ def identify_intent_practice_question(user_query):
       ]
     )
     intent = chat_completion.choices[0].message.content.strip()
+    print('-----',intent)
     return intent
 
-# def validation_check(user_query):
-#     prompt = (
-#         f"""Identify the user input: "{user_query}".
-#         its related to user repose its validate the data is correct or not correct  if correct and return True and if not correct then return False"""
-#     )
-#     chat_completion = client.chat.completions.create(
-#       model="gpt-3.5-turbo",
-#       messages=[
-#           {
-#               "role": "user",
-#               "content": prompt,
-#           }
-#       ]
-#     )
+def edit_msg(text):
+    # Define a list of prompts to transform the input text
+    prompt = f"How would you ask this question when user want to edit .'{text}'"
+    response = client.chat.completions.create(
+ 
+        model="gpt-3.5-turbo",
+ 
+        messages=[
+ 
+            {"role": "user",  "content": prompt}
+ 
+        ],
+ 
+        max_tokens=60,
+        temperature=0.9
+ 
+    )
+ 
+    # Extract the response text
+    transformed_text = response.choices[0].message.content.strip()
+    return transformed_text
+
+def date_time_format(date_time):
+    date_pattern = r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b'
+ 
+    prompt = f"Convert the date and time in this format {date_pattern}: '{date_time}'"
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+             {
+                 "role": "user",  
+              "content": prompt
+              }
+        ],
+        max_tokens=60,
+        temperature=0.9
+    )
+   
+    transformed_text = response.choices[0].message['content']
+    return transformed_text
 
 def validation_check(user_query):
     prompt = (
@@ -564,11 +591,11 @@ def prefred_date_time_fun(response):
   
   else:
     patterns = [
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b', '%B %d, %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d, %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
         (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})\b', '%B %d, %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})\b', '%B %d %Y'),
-        (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4}), (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
+        (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
         (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})\b', '%d %B %Y'),
         (r'\b(\d{1,2}) (AM|PM)\b', None),
         (r'\b(Morning|Afternoon|Evening|Night)\b', None),
@@ -578,7 +605,7 @@ def prefred_date_time_fun(response):
         (r'\b(\d{2})/(\d{1,2})/(\d{4})\b', '%m/%d/%Y'),
         (r'\b(\d{4})/(\d{2})/(\d{1,2})\b', '%Y/%m/%d'),
     ]
- 
+    
     # Time mappings for periods of the day
     time_mappings = {
         "Morning": 9,
@@ -588,7 +615,7 @@ def prefred_date_time_fun(response):
     }
    
     datetime_obj = None
- 
+    
     for pattern, date_format in patterns:
         match = re.search(pattern, response)
         if match:
@@ -626,6 +653,7 @@ def prefred_date_time_fun(response):
         raise ValueError("No valid date format found in the response")
  
     return datetime_obj.isoformat()
+ 
  
 # Tool to book appointment
 def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
@@ -949,6 +977,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     reason_id = request.session['reason_id']
  
     # Step 4: Get the open slots for the selected location, provider, and reason
+    print(prefred_date_time,'prefred_date_time -----------------')
     preferred = prefred_date_time_fun(prefred_date_time)
     print("Preferred date time", preferred)
  
@@ -998,7 +1027,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
 
 
     try:
-        request.session['confirmation']
+        print(request.session['confirmation'],'======================')
     except:
         request.session['confirmation'] = 'True'
     
@@ -1079,8 +1108,8 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         #     print(f"An error occurred while booking the appointment: {e}")
         #     return f"Failed to book appointment. Status code: {book_appointment_response.status_code}"
     elif request.session['confirmation'] == 'no':
-
-        pass
+        msg=handle_user_query1(confirmation_message)
+        return msg
 
     
     # if not validation_result.get("Isvalidated"):
@@ -1122,7 +1151,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
 
 # Function to generate response using Hugging Face endpoint
 def generate_response(prompt, max_length=512, num_return_sequences=1):
-    api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"
+    api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"  
     api_token = os.getenv("HUGGINGFACE_API_TOKEN")
     return call_huggingface_endpoint(prompt, api_url, api_token)
 
@@ -1149,12 +1178,37 @@ def handle_user_query1(request,user_query):
 
     intent = identify_intent_practice_question(user_query)
     if intent != 'other':
-        if 'address' in intent:
-            prompt = f"Please provide your a valid Email address the email you provided is not valid" 
+        print(intent,'intent')
+        data = json.loads(request.body.decode('utf-8'))
+        if 'address' in intent or 'Address' in intent:
+            prompt = f"""i want to give them my Address {data.get('practice_address', '')}""" 
+            print(prompt)
             user_response = transform_input(prompt)
-        
+            return user_response
+        elif 'name' in intent or 'Name' in intent:
+            data = json.loads(request.body.decode('utf-8'))
 
-        return intent
+            prompt = f""" this is our Name :{data.get('practice_name', '')}""" 
+            user_response = transform_input(prompt)
+            return user_response
+        elif 'hour' in intent or 'Hour' in intent:
+            data = json.loads(request.body.decode('utf-8'))
+    
+            prompt = f""" this is our email working hours :{data.get('practice_hour', '')}""" 
+            user_response = transform_input(prompt)
+            return user_response
+        elif 'email' in intent or 'Email' in intent:
+            data = json.loads(request.body.decode('utf-8'))
+    
+            prompt = f"""this is our email :{data.get('practice_email', '')}""" 
+            user_response = transform_input(prompt)
+            return user_response
+        else:
+           pass
+
+        
+        # print(user_response,'-------------------')
+        # return user_response
 
     intent = identify_intent(user_query)
     
@@ -1248,7 +1302,8 @@ def handle_user_query1(request,user_query):
         Email = extracted_info.get('Email')
         prefred_date_time = extracted_info.get('Preferred date or time')
 
-
+        # prefred_date_time = date_time_format(prefred_date_time)
+        # print(prefred_date_time,'prefred_date_time')
 
         verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
 
@@ -1259,9 +1314,18 @@ def handle_user_query1(request,user_query):
             return "Failed to authenticate."
 
 
+        if 'confirmation' in request.session:
+            if request.session['confirmation'].lower() == 'no':
+                edit_response = edit_msg(user_query)
+                # request.session['context'] = edit_response
+                return edit_response
+
         # Book the appointment
-        
-        book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
+        try:
+            book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
+        except:
+            data = json.loads(request.body.decode('utf-8'))
+            book_appt=f"Please  contact : {data.get('practice_email', '')} "
         
         try:
             if 'Appointment scheduled successfully' in book_appt:
@@ -1355,9 +1419,29 @@ def home(request):
             del request.session['otp']
             del request.session['return_response']
             del request.session['confirmation']
+            print('all session deleted deleted')
         except:
             pass
     return render(request, "pages/home.html", context)
+def home2(request):
+    context = {
+        "debug": settings.DEBUG,
+        "django_ver": get_version(),
+        # "python_ver": os.environ["PYTHON_VERSION"],
+    }
+    if request.method=='GET':
+        try:
+            del request.session['context']
+            del request.session['book_appointment']
+            del request.session['provider_id']
+            del request.session['reason_id']
+            del request.session['slot_id']
+            del request.session['otp']
+            del request.session['return_response']
+            del request.session['confirmation']
+        except:
+            pass
+    return render(request, "pages/home2.html", context)
     
 @csrf_exempt
 def func(request):
@@ -1441,6 +1525,13 @@ def handle_user_query(request):
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 
         response = handle_user_query1(request,input_message)
+        if response=='none' or response==None:
+            data = json.loads(request.body.decode('utf-8'))
+
+            response=f"Please contact :{data.get('practice_email', '')} "
+            return response
+
+            response = generate_response(input_message)
         return response
         # return JsonResponse({"response": response})
    
