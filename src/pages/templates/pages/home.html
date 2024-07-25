@@ -435,13 +435,9 @@ Yes, but there is not guarantee if you get appointment or not.
                 </div>
               </div>
             `);
-            if (response.response.includes('Thanks, Have a great day!')) {
-                    $('#kt_chat_messenger_footer').hide();
-                }
-
-
-                $('#chat_submit').hide();
-                $('#restart_button').show();
+               
+                // $('#chat_submit').hide();
+                // $('#restart_button').show();
             // Scroll to the bottom of the chat
             var chatBody = $('#kt_chat_messenger_body .scroll-y');
             chatBody.scrollTop(chatBody[0].scrollHeight);

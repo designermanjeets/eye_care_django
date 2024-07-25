@@ -1437,9 +1437,9 @@ def handle_user_query1(request,user_query):
                 return edit_response
 
         # Book the appointment
-        if True:
+        try:
             book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
-        else:
+        except:
             data = json.loads(request.body.decode('utf-8'))
             book_appt=f"Please  contact : {data.get('practice_email', '')} "
         
@@ -1668,13 +1668,13 @@ def handle_user_query(request):
         if not input_message:
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 
-        if True:
+        try:
             response = handle_user_query1(request,input_message)
-        # except:
-        #     print('error in handle_user_query1')
-        #     data = json.loads(request.body.decode('utf-8'))
-        #     response = f"please contact our support team :{data.get('practice_email', '')}"
-        #     return response
+        except:
+            print('error in handle_user_query1')
+            data = json.loads(request.body.decode('utf-8'))
+            response = f"please contact our support team :{data.get('practice_email', '')}"
+            return response
         print(response,'response----------------')
         if response=='none' or response==None:
             data = json.loads(request.body.decode('utf-8'))
