@@ -188,7 +188,7 @@ def identify_intent_practice_question(user_query,user_data):
             else return the answer as information not available. 
             or if it Is greeting or  related to book an appointment, rescheduling an appointment, canceling an appointment, or something else that is not prwesent in user data then  
             Just return text as  'booking an appointment'
-            and if userquery intent is regarding greeting like hello hii Good morning then return the greeting 
+            and if userquery intent is regarding greeting like hello hii then reply something like how are you or how can i help you  regararding appointments or something.
                """
               
         
@@ -653,6 +653,7 @@ def prefred_date_time_fun(response):
             return next_day.strftime("%Y-%m-%dT%H:%M:%S")
  
   else:
+    print("response============================",response)
     patterns = [
         (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}), (\d{4}) ,  (Morning|Afternoon|Evening|Night)\b', '%B %d, %Y'),
         (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}), (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d, %Y'),
@@ -815,6 +816,7 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
     except requests.exceptions.RequestException as e:
         print(f"An error occurred while fetching appointment reasons: {e}")
         return
+        
     if reasons_response.status_code != 200:
         return f"Failed to get appointment reasons. Status code: {reasons_response.status_code}"
     try:
@@ -1315,7 +1317,7 @@ def handle_user_query1(request,user_query):
     
     
     
-    print(f"Identified intent: {intent}")
+    # print(f"Identified intent: {intent}")
 
 
 
@@ -1432,9 +1434,9 @@ def handle_user_query1(request,user_query):
                 return edit_response
 
         # Book the appointment
-        try:
+        if True:
             book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
-        except:
+        else:
             data = json.loads(request.body.decode('utf-8'))
             book_appt=f"Please  contact : {data.get('practice_email', '')} "
         
@@ -1664,13 +1666,13 @@ def handle_user_query(request):
         if not input_message:
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 
-        try:
+        if True:
             response = handle_user_query1(request,input_message)
-        except:
-            print('error in handle_user_query1')
-            data = json.loads(request.body.decode('utf-8'))
-            response = f"please contact our support team :{data.get('practice_email', '')}"
-            return response
+        # except:
+        #     print('error in handle_user_query1')
+        #     data = json.loads(request.body.decode('utf-8'))
+        #     response = f"please contact our support team :{data.get('practice_email', '')}"
+        #     return response
         print(response,'response----------------')
         if response=='none' or response==None:
             data = json.loads(request.body.decode('utf-8'))

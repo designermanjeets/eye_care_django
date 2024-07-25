@@ -74,6 +74,7 @@
           <!--end::Actions-->
           <!--begin::Send-->
           <button id="chat_submit" class="btn btn-primary" type="submit" name="submit" data-kt-element="send">Send</button>
+          <button style="display: none;" id="restart_button" class="btn btn-primary" type="submit" name="restart" data-kt-element="send">Restart Chat</button>
           <!--end::Send-->
       </div>
       <!--end::Toolbar-->
@@ -275,8 +276,8 @@ Yes, but there is not guarantee if you get appointment or not.
     
     let typingTimer;
 
-    var doneTypingInterval1 = 35000; // 50 seconds
-    var doneTypingInterval2 = 35000; // 10 seconds
+    var doneTypingInterval1 = 50000; // 50 seconds
+    var doneTypingInterval2 = 50; // 10 seconds
 
     // Function to handle typing in the chatbox
  
