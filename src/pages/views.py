@@ -144,7 +144,6 @@ def identify_intent(user_query):
         Is it related to book an appointment, rescheduling an appointment, canceling an appointment, or something else? And also check the appointment date and time
         Also, check if the query includes an appointment date and time, if applicable."""
     )
-    print("prompt", prompt)
 
     retries = 3
     backoff_factor = 0.3
@@ -162,7 +161,6 @@ def identify_intent(user_query):
             )
             # Extract the intent from the response
             intent = chat_completion.choices[0].message.content.strip()
-            print("intent", intent)
             return intent
         except requests.exceptions.RequestException as e:
             if attempt < retries - 1:
@@ -177,7 +175,6 @@ def identify_intent(user_query):
             return "Error: An unexpected error occurred while identifying intent."
 
 def identify_intent_practice_question(user_query,user_data):
-    print(user_data)
     prompt = (
         # f"""Identify the intent of this query :  "{user_query}".
         # and if it is asking for an address, email , or work timimg  or name reply me in a single word only as address for address, name for name, email for email, hours for work timing or working hours or simillar
@@ -204,7 +201,6 @@ def identify_intent_practice_question(user_query,user_data):
       ]
     )
     intent = chat_completion.choices[0].message.content.strip()
-    print('-----',intent)
     return intent
 
 def edit_msg(request):
@@ -219,7 +215,6 @@ def edit_msg(request):
     if request.session['edit_msg']=='True':
         # Extract the current context from the session
         current_context = request.session.get('context', '{}')
-        print("sdfnkjg",current_context)
    
         # Convert context from JSON string to dictionary if necessary
         if isinstance(current_context, str):
@@ -236,10 +231,8 @@ def edit_msg(request):
         user_response = transform_input(prompt)
         return user_response
     else:
-        print("dwhihdw",request.session['edit_msg'])
         edit_msg=request.session['edit_msg']
         context=request.session['context']
-        print("esgnijsg",user_response)
         prompt = (
         f"""this is my old context{context} and i want to update this context {edit_msg} using this infomation"""
            
@@ -254,7 +247,6 @@ def edit_msg(request):
         ]
         )
         context = chat_completion.choices[0].message.content.strip()
-        print('ecwaf----',context)
         request.session['context']=context
         del request.session['edit_msg']
         del request.session['confirmation']
@@ -1282,7 +1274,6 @@ def validate_phone(phone):
     return re.match(pattern, phone) is not None
 def handle_user_query1(request,user_query):
     # Identify the user's intent
-    print("user_query:", user_query)
     data = json.loads(request.body.decode('utf-8'))
     intent = identify_intent_practice_question(user_query,data.get('practice1_details', ''))
     
@@ -1595,7 +1586,6 @@ def func(request):
         data = json.loads(request.body.decode('utf-8'))
         message = data.get('input', '')
         querry=message
-        print("querry",querry)
         if  request.session.get('book_appointment')=='True':
             try:
                 request.session['book_appointment']=message
