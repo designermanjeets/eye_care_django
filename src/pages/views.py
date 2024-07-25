@@ -343,15 +343,17 @@ def transform_input(input_text):
     # Define a list of prompts to transform the input text
     prompts = [
 
-        f"Rephrase the following request in a more engaging way related to appintment: '{input_text}'",
+        f"Rephrase the following request in a more engaging way related to appointment do not use brackets : '{input_text}'",
 
-        f"How would you ask this question in a friendly and conversational tone related to appintment: '{input_text}'?",
+        f"How would you ask this question in a friendly and conversational tone related to appointment do not use brackets :  '{input_text}'?",
 
-        f"Make this request sound more personable and interesting related to appintment: '{input_text}'",
+        f"How would you ask this question in a friendly and conversational tone related to appintment and shoud be ques not like ask ques on bracket: '{input_text}'?",
 
-        f"Convert this question into a warm and inviting request related to appintment: '{input_text}'",
+        f"Make this request sound more personable and interesting related to appointment do not use brackets : '{input_text}'",
 
-        f"Turn the following statement into a casual and friendly question related to appintment: '{input_text}'"
+        f"Convert this question into a warm and inviting request related to appointment do not use brackets : '{input_text}'",
+
+        f"Turn the following statement into a casual and friendly question related to appointment do not use brackets : '{input_text}'"
 
     ]
 
@@ -654,12 +656,13 @@ def prefred_date_time_fun(response):
  
   else:
     print("response============================",response)
+    response=response.replace(',','')
     patterns = [
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}), (\d{4}) ,  (Morning|Afternoon|Evening|Night)\b', '%B %d, %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}), (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d, %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
         (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4}) , (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}), (\d{4})\b', '%B %d, %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
         (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
         (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
         (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4})\b', '%d %B %Y'),
@@ -691,11 +694,15 @@ def prefred_date_time_fun(response):
     datetime_obj = None
    
     for pattern, date_format in patterns:
+        print(response,'response++')
         match = re.search(pattern, response)
+        
         if match:
             groups = match.groups()
             if date_format:
+                print(match,'match')
                 date_str = ' '.join(groups[:3])
+                print(date_str,'date_str')
                 datetime_obj = datetime.strptime(date_str, date_format)
                 if len(groups) == 4:  # If there's a time of day
                     period = groups[3]
@@ -1218,29 +1225,34 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
             print(f"An error occurred while booking the appointment: {e}")
             if book_appointment_response.status_code != 200:
                 return f"Failed to book appointment. Status code: {book_appointment_response.status_code}"
-
-
+        
         open_slot=''
         for idx, slot in enumerate(open_slots): 
-            if  slot['OpenSlotId'] == open_slot_id:
+            print(slot['OpenSlotId'],open_slot_id,'slot========')
+            if  str(slot['OpenSlotId']).strip() == str(open_slot_id).strip():
+                print(f"{slot['ApptStartDateTime']} - {slot['ApptEndDateTime']}")
                 open_slot=f"{slot['ApptStartDateTime']} - {slot['ApptEndDateTime']}"
 
         book_appointment_payload = {
             "Time Slot ": open_slot,
             "Appt. Date": appointment_date,
-            "ReasonId": reason_id,
+            
             "FirstName": FirstName,
             "LastName": LastName,
             "PatientDob": DOB,
             "MobileNumber": PhoneNumber,
-            "EmailId": Email}    
-        result = f"""Your Appointment is scheduled, Thanks for choosing eyecare location!, Is there anything i can help you with? 
+            "EmailId": Email}  
+          
+        result = f"""Your Appointment is scheduled, Thanks for choosing us , Is there anything i can help you with? 
         appointment Details:
         {book_appointment_payload}
         
         
         """
+        result= transform_input(result)
+        result=result+'\n'+'Thanks, Have a great day! '
         return result
+    
     
     return "Thanks, Have a great day! "
 
