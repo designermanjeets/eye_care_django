@@ -1,7 +1,9 @@
 {% extends "layouts/index.html" %}
 {% load static %}
 
-{% block title %}Docker + Django{% endblock %}
+
+
+{% block title %}Practice 2{% endblock %}
 
 {% block body %}
 
@@ -74,6 +76,7 @@
           <!--end::Actions-->
           <!--begin::Send-->
           <button id="chat_submit" class="btn btn-primary" type="submit" name="submit" data-kt-element="send">Send</button>
+          <button style="display: none;" id="restart_button" class="btn btn-primary" type="submit" name="restart" data-kt-element="send">Restart Chat</button>
           <!--end::Send-->
       </div>
       <!--end::Toolbar-->
@@ -103,16 +106,237 @@
   }
 
   const csrftoken = getCookie('csrftoken');
-  const practice_add=` U.S Corporate Office
-                      Rose City Eye Care 
-                      5423 NE Central Street 
-                      Suite 40
-                      New York  12322  `;
+  const practice_add=` `;
   const practicde_name='First Insight Vision'; 
   const practice_hour='9 AM to4 PM PST';                                     
-  const practice_email='eyecare@gmail.com';                                     
+  const practice_email='eyecare@gmail.com';   
+  const practice1_details=`Practice Name: First Insight Vision 
 
+Practice Hours: 9 AM to4 PM PST 
+
+Practice Email: eyecare@gmail.com 
+
+ 
+
+Office Address 
+
+U.S Corporate Office 
+
+Rose City Eye Care 
+
+5423 NE Central Street 
+
+Suite 40 
+
+New York  12322 
+
+  
+
+ 
+
+Insurance Coverage list : https://www.maximeyes.com/ link 
+
+ 
+
+We have below providers: 
+
+Dr Willamson (Pediatrics) 
+
+Dr. Willamson have 18 Year of extensive experience in Pediatric eye surgeries 
+
+Dr. John  (Surgeon) 
+
+xxxxx 
+
+ 
+
+We have below services 
+
+OPD 
+
+Glaucoma 
+
+Lasik Surgery 
+
+ 
+
+           Product offered: 
+
+Complete Eye check up: 600$ 
+
+Comprehensive Eye checkup: 400$ 
+
+ 
+
+            Parking instructions: 
+
+Please park your vehicle in parking at L2 level in parking reserved for our clinic 
+
+ 
+
+What should patient bring for their visit: 
+
+Last medical report, Insurance card copy 
+
+ 
+
+Cancelation or no show policy: 
+
+Refer maximeyes.com for cancelation policy 
+
+ 
+
+Payment types accepted: 
+
+ Cash and GPay 
+
+ 
+
+Financing options available: 
+
+Yes, With several credit card we do provide EMI option 
+
+ 
+
+What languages are spoken in your office?: 
+
+ English 
+
+ 
+
+Are your facilities accessible for individuals with disabilities? 
+
+Yes 
+
+ 
+
+Do you offer any discounts? (Military, vetrans, childern, ect?) 
+
+No 
+
+Do you have options for patietns to fill out paper work online? 
+
+Yes, It is there and we recommend to fill before coming to clinic, it will save too much time, please vision https://intake.maximeyes.com to fill intake forms 
+
+ 
+
+ 
+
+  
+
+  
+
+Do you want to allow online booking?: 
+
+Yes, https://booking,maximeyes.com 
+
+ 
+
+Should patients arrive earlier than their scheduled appointment time? 
+
+No 
+
+ 
+
+Do you offer a wait list? 
+
+No 
+  
+  `;                                  
+  
   $(document).ready(function () {
+    
+    let typingTimer;
+
+    var doneTypingInterval1 = 35000; // 50 seconds
+    var doneTypingInterval2 = 35000; // 10 seconds
+
+    // Function to handle typing in the chatbox
+ 
+    // Function to handle typing in the chatbox
+    $('#chatbox').on('input', function () {
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(function() {
+        doneTyping1();
+        // Define a flag to check if there's been input after doneTyping1
+        let inputAfterDoneTyping1 = false;
+
+        // Check if there's been any input after doneTyping1
+        $('#chatbox').on('input', function() {
+          inputAfterDoneTyping1 = true;
+        });
+
+        // Only execute doneTyping2 if there hasn't been input after doneTyping1
+        setTimeout(function() {
+          if (!inputAfterDoneTyping1) {
+            doneTyping2();
+          }
+        }, doneTypingInterval2);
+
+      }, doneTypingInterval1);
+    });
+
+    // Function called when user stops typing and first message
+    function doneTyping1() {
+      // Append first bot's response to the chat window
+      $('#kt_chat_messenger_body .scroll-y').append(`
+        <div class="d-flex justify-content-start mb-10">
+          <div class="d-flex flex-column align-items-start">
+            <div class="d-flex align-items-center mb-2">
+              <div class="symbol symbol-35px symbol-circle">
+                <img alt="Pic" src="{% static 'static/images/avatars/300-25.jpg' %}" />
+              </div>
+              <div class="ms-3">
+                <a href="#" class="fs-5 fw-bold text-gray-900 text-hover-primary me-1">Bot</a>
+                <span class="text-muted fs-7 mb-1">Just now</span>
+              </div>
+            </div>
+            <div class="p-5 rounded bg-light-info text-dark fw-semibold mw-lg-400px text-start"
+              data-kt-element="message-text"> Hii, are you still there ?</div>
+          </div>
+        </div>
+      `);
+
+      // Scroll to the bottom of the chat
+      var chatBody = $('#kt_chat_messenger_body .scroll-y');
+      chatBody.scrollTop(chatBody[0].scrollHeight);
+    }
+
+    // Function called after a shorter interval for second message
+    function doneTyping2() {
+      // Append second bot's response to the chat window
+      $('#kt_chat_messenger_body .scroll-y').append(`
+        <div class="d-flex justify-content-start mb-10">
+          <div class="d-flex flex-column align-items-start">
+            <div class="d-flex align-items-center mb-2">
+              <div class="symbol symbol-35px symbol-circle">
+                <img alt="Pic" src="{% static 'static/images/avatars/300-25.jpg' %}" />
+              </div>
+              <div class="ms-3">
+                <a href="#" class="fs-5 fw-bold text-gray-900 text-hover-primary me-1">Bot</a>
+                <span class="text-muted fs-7 mb-1">Just now</span>
+              </div>
+            </div>
+            <div class="p-5 rounded bg-light-info text-dark fw-semibold mw-lg-400px text-start"
+              data-kt-element="message-text"> Thank you For your time .</div>
+          </div>
+        </div>
+      `);
+
+      // Scroll to the bottom of the chat
+      var chatBody = $('#kt_chat_messenger_body .scroll-y');
+      chatBody.scrollTop(chatBody[0].scrollHeight);
+
+      // Hide the send button and show the restart button
+      $('#chat_submit').hide();
+     
+      $('#restart_button').show();
+    }
+    $('#restart_button').click(function() {
+      // Reload the page
+      location.reload();
+    });
+
     $('#chat_submit').click(function (e) {
       e.preventDefault();
       var message = $('#chatbox').val();
@@ -138,12 +362,12 @@
                 </div>
               </div>
             `);
-
+            
             var scrollElement = $('#kt_chat_messenger_body .scroll-y');
             scrollElement.scrollTop(scrollElement.prop('scrollHeight'));
 
             $('#chatbox').val(''); // Clear the input box
-        console.log()
+        
         $.ajax({
           type: 'POST',
           url: '/handle_jquery_response',
@@ -155,13 +379,14 @@
               practice_address:practice_add,
               practice_name:practicde_name,
               practice_hour:practice_hour,
-              practice_email:practice_email
+              practice_email:practice_email,
+              practice1_details:practice1_details
           }),
           contentType: 'application/json; charset=utf-8',
           dataType: 'json',
           success: function (response) {
            
-            
+          
 
             // Append bot's response to the chat window
             $('#kt_chat_messenger_body .scroll-y').append(`
@@ -185,6 +410,55 @@
             // Scroll to the bottom of the chat
             var chatBody = $('#kt_chat_messenger_body .scroll-y');
             chatBody.scrollTop(chatBody[0].scrollHeight);
+            // console.log('hello')
+            // setTimeout(function() {
+            //   $('#kt_chat_messenger_body .scroll-y').append(`
+            //   <div class="d-flex justify-content-start mb-10">
+            //     <div class="d-flex flex-column align-items-start">
+            //       <div class="d-flex align-items-center mb-2">
+            //         <div class="symbol symbol-35px symbol-circle">
+            //           <img alt="Pic" src="{% static 'static/images/avatars/300-25.jpg' %}" />
+            //         </div>
+            //         <div class="ms-3">
+            //           <a href="#" class="fs-5 fw-bold text-gray-900 text-hover-primary me-1">Bot</a>
+            //           <span class="text-muted fs-7 mb-1">Just now</span>
+            //         </div>
+            //       </div>
+            //       <div class="p-5 rounded bg-light-info text-dark fw-semibold mw-lg-400px text-start"
+            //         data-kt-element="message-text"> Hii, are you still there ?</div>
+            //     </div>
+            //   </div>
+            // `);
+            //     console.log('huii')
+            // // Scroll to the bottom of the chat after adding the delayed message
+            //       chatBody.scrollTop(chatBody[0].scrollHeight);
+            //   }, 6000); // 120000 milliseconds = 2 minutes
+
+            // // Re-enable the send button and hide the bot typing indicator
+            // $('#chat_submit').attr('disabled', false);
+            // $('#bot-typing').hide();
+            // setTimeout(function() {
+            //   $('#kt_chat_messenger_body .scroll-y').append(`
+            //   <div class="d-flex justify-content-start mb-10">
+            //     <div class="d-flex flex-column align-items-start">
+            //       <div class="d-flex align-items-center mb-2">
+            //         <div class="symbol symbol-35px symbol-circle">
+            //           <img alt="Pic" src="{% static 'static/images/avatars/300-25.jpg' %}" />
+            //         </div>
+            //         <div class="ms-3">
+            //           <a href="#" class="fs-5 fw-bold text-gray-900 text-hover-primary me-1">Bot</a>
+            //           <span class="text-muted fs-7 mb-1">Just now</span>
+            //         </div>
+            //       </div>
+            //       <div class="p-5 rounded bg-light-info text-dark fw-semibold mw-lg-400px text-start"
+            //         data-kt-element="message-text"> Thank you for your Time and Let Me Know if you Need any further assistance.  </div>
+            //     </div>
+            //   </div>
+            // `);
+            //     console.log('huii')
+            // // Scroll to the bottom of the chat after adding the delayed message
+            //       chatBody.scrollTop(chatBody[0].scrollHeight);
+            //   }, 12000); // 120000 milliseconds = 2 minutes
 
             // Re-enable the send button and hide the bot typing indicator
             $('#chat_submit').attr('disabled', false);
@@ -195,10 +469,60 @@
             // Re-enable the send button and hide the bot typing indicator in case of error
             $('#chat_submit').attr('disabled', false);
             $('#bot-typing').hide();
+            
           }
         });
       }
     });
+
   });
 </script>
 {% endblock %}
+
+<!-- 
+
+
+success: function (response) {
+  // Append bot's response to the chat window
+  $('#kt_chat_messenger_body .scroll-y').append(`
+      <div class="d-flex justify-content-start mb-10">
+          <div class="d-flex flex-column align-items-start">
+              <div class="d-flex align-items-center mb-2">
+                  <div class="symbol symbol-35px symbol-circle">
+                      <img alt="Pic" src="{% static 'static/images/avatars/300-25.jpg' %}" />
+                  </div>
+                  <div class="ms-3">
+                      <a href="#" class="fs-5 fw-bold text-gray-900 text-hover-primary me-1">Bot</a>
+                      <span class="text-muted fs-7 mb-1">Just now</span>
+                  </div>
+              </div>
+              <div class="p-5 rounded bg-light-info text-dark fw-semibold mw-lg-400px text-start"
+                  data-kt-element="message-text">${response.response}</div>
+          </div>
+      </div>
+  `);
+
+  // Scroll to the bottom of the chat
+  var chatBody = $('#kt_chat_messenger_body .scroll-y');
+  chatBody.scrollTop(chatBody[0].scrollHeight);
+
+  // Re-enable the send button and hide the bot typing indicator
+  $('#chat_submit').attr('disabled', false);
+  $('#bot-typing').hide();
+
+  // Send a message after 2 minutes
+  setTimeout(function() {
+      $('#kt_chat_messenger_body .scroll-y').append(`
+          <div class="d-flex justify-content-end mb-10">
+              <div class="d-flex flex-column align-items-end text-right">
+                  <div class="p-5 rounded bg-light-primary text-dark fw-semibold mw-lg-400px text-start"
+                      data-kt-element="message-text">This is a delayed message after 2 minutes.</div>
+              </div>
+          </div>
+      `);
+
+      // Scroll to the bottom of the chat after adding the delayed message
+      chatBody.scrollTop(chatBody[0].scrollHeight);
+  }, 120000); // 120000 milliseconds = 2 minutes
+}, -->
+
