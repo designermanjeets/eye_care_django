@@ -145,28 +145,45 @@ def identify_intent(user_query):
     #     Is it related to book an appointment, rescheduling an appointment, canceling an appointment, or something else? And also check the appointment date and time
     #     Also, check if the query includes an appointment date and time, if applicable."""
     # # )
-    # prompt=(f"""Given the following user query: "{user_query}", perform the following tasks:
-    #     Identify the primary intent of the query. Determine if it is a greeting, a request to book an appointment, reschedule an appointment, cancel an appointment, or another type of inquiry.
-    #     If the query is a greeting, respond with "Hello, how can I help you regarding appointments? or any other ques related to this".
-    #     Check if the query includes any specific appointment date and time details. If applicable, extract and validate this information.""")
-    prompt=(f"""Given the following user query: "{user_query}", perform the following tasks:
-            Identify the primary intent of the query. Determine if it is:
-            A greeting
-            A request to book an appointment
-            Reschedule an appointment
-            Cancel an appointment
-            A request for static information (e.g., office timings, address)
-            Another type of inquiry 
-            If the query is a greeting, respond with "Hello, how can I help you regarding appointments?".
-            If the query is a request for static information, respond with the appropriate details (e.g., office timings, address).
-            Check if the query includes any specific appointment date and time details. If applicable, extract and validate this information.""")
+    # prompt = (
+    #     f"""Given the following user query: "{user_query}", perform the following tasks:
+    #     1. Identify the primary intent of the query. Determine if it is:
+    #        - A greeting
+    #        - A request to book an appointment
+    #        - A request to reschedule an appointment
+    #        - A request to cancel an appointment
+    #        - A request for static information (e.g., office timings, address)
+    #        - Another type of inquiry
+    #     2. If the query is a greeting, respond with "Hello, how can I help you regarding appointments or any other questions related to this?".
+    #     3. If the query is not related to eye check-up or eye health issues, respond with "Please ask a valid question related to eye care or appointments.".
+    #     4. If the query is a request for static information, respond with the appropriate details (e.g., office timings, address) return "static" only .
+    #     5. Check if the query includes any specific appointment date and time details. If applicable, extract and validate this information."""
+    # )
+    prompt=(
+        f"""Given the following user query: "{user_query}", identify the primary intent. The intent could be:
+        - Greeting
+        - Booking an appointment
+        - Rescheduling an appointment
+        - Canceling an appointment
+        - Requesting static information (e.g., office hours, address)
+        - Other inquiries
+ 
+        For each intent:
+        - If it’s a greeting, respond warmly like: "Hi there! How can I assist you today?"
+        - For booking, rescheduling, or canceling appointments, provide clear and helpful instructions.
+        - For static information requests  return result "static"
+        - For other inquiries, provide a friendly and helpful response.
+        and make sure that if query is regarding appointments it doesnot goes to static part
+        Avoid overly formal or robotic responses, and tailor the language to be more like a friendly human conversation.
+        and please note that donot return same text if you donot understand ask your queries
+    """)
     retries = 3
     backoff_factor = 0.3
-
+ 
     for attempt in range(retries):
         try:
             chat_completion = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4",
                 messages=[
                     {
                         "role": "user",
@@ -176,7 +193,7 @@ def identify_intent(user_query):
             )
             # Extract the intent from the response
             intent = chat_completion.choices[0].message.content.strip()
-            # print("regnskj",intent)
+            print("regnskj",intent)
             return intent
         except requests.exceptions.RequestException as e:
             if attempt < retries - 1:
@@ -190,106 +207,26 @@ def identify_intent(user_query):
             print(f"An unexpected error occurred: {e}")
             return "Error: An unexpected error occurred while identifying intent."
 
-def handle_static_queries(user_query, static_data):
-    # Convert the query to lowercase for case-insensitive matching
-    query_lower = user_query.lower()
-
-    # Static data dictionary
-    static_data = {
-        "practice_name": "Rose City Eye Care",
-        "practice_hours": "8 AM to 8 PM PST",
-        "practice_email": "RoseCity@gmail.com",
-        "address_us": """U.S Corporate Office
-                         Rose City Eye Care
-                         6723 NE Bennett Street
-                         Suite 200
-                         Hillsboro, Oregon 97124""",
-        "address_india": """India Offices
-                            Rose City Eye Care
-                            2nd Floor, Server Space,
-                            AG Technology Park
-                            Off ITI Road
-                            Survey No. 127/1A
-                            Plot No. 8
-                            Aundh, Pune – 411 007""",
-        "insurance_coverage": "https://www.first-insight.com/",
-        "providers": """Dr Anderson (Pediatrics)
-                        Dr. Anderson has 12 Years of extensive experience in Pediatric eye surgeries
-                        Dr. John (Surgeon)""",
-        "services": """OPD
-                       Cataract Surgery
-                       Glaucoma""",
-        "products": """Complete Eye check up: $200
-                       Comprehensive Eye checkup: $100""",
-        "parking_instructions": "Please park your vehicle in parking at L1 level reserved for our clinic",
-        "what_to_bring": "Last medical report, Insurance card copy",
-        "cancellation_policy": "Refer google.com for cancellation policy",
-        "payment_types": """VISA, Credit card, Gpay, Cash, CareCredit""",
-        "financing_options": "Yes, With several credit cards we do provide EMI options",
-        "languages_spoken": "Spanish, English",
-        "accessible_facilities": "Yes",
-        "discounts": "Yes, we offer a 10% discount for Military employees",
-        "online_paperwork": "Yes, please visit https://intake.maximeyes.com to fill intake forms",
-        "online_payments": """Yes, we support VISA Credit card, Gpay, Cash""",
-        "online_booking": "Yes, https://booking.max.com",
-        "arrive_early": "No",
-        "wait_list": "Yes, but there is no guarantee of an appointment"
-    }
-
-    # Keywords for static data
-    static_keywords = {
-        "name": "practice_name",
-        "hours": "practice_hours",
-        "email": "practice_email",
-        "address": "address_us",  # You might need to distinguish between US and India addresses
-        "insurance": "insurance_coverage",
-        "providers": "providers",
-        "services": "services",
-        "products": "products",
-        "parking": "parking_instructions",
-        "bring": "what_to_bring",
-        "cancellation": "cancellation_policy",
-        "payment": "payment_types",
-        "financing": "financing_options",
-        "languages": "languages_spoken",
-        "accessibility": "accessible_facilities",
-        "discounts": "discounts",
-        "paperwork": "online_paperwork",
-        "payments": "online_payments",
-        "booking": "online_booking",
-        "arrive": "arrive_early",
-        "wait": "wait_list"
-    }
-
-    for keyword, data_key in static_keywords.items():
-            if re.search(r'\b' + re.escape(keyword) + r'\b', query_lower):
-                return static_data.get(data_key, "Sorry, I don't have that information.")
-        
-    return "Sorry, I don't understand your request. Can you please provide more details?"
 
 
-
-def identify_intent_practice_question(user_query,user_data):
-    # print(user_data)
+def identify_intent_practice_question(user_query,data):
+    # prompt = (
+    #     f"""Identify the intent of this query :  "{user_query}".
+    #     and if it is asking for an address, email , or work timimg  or name reply me in a single word only as address for address, name for name, email for email, hours for work timing or working hours or simillar
+    #     and if intentent is not frome abouve given then return the intent as other"""                    
+    # )
     prompt = (
-        # f"""Identify the intent of this query :  "{user_query}".
-        # and if it is asking for an address, email , or work timimg  or name reply me in a single word only as address for address, name for name, email for email, hours for work timing or working hours or simillar
-        # and if intentent is not frome abouve given then return the intent as other"""
-        f""" this is my user_data :  {user_data}  
-            i want to answer the question related to this user_data and asked question is : {user_query}  
-            Please answer the related questions only if the answers are given in the user data then return the answer from the user data 
-            else return the answer as information not available. 
-            or if it Is greeting or  related to book an appointment, rescheduling an appointment, canceling an appointment, or something else that is not prwesent in user data then  
-            Just return text as  'booking an appointment'
-            and if userquery intent is regarding greeting like hello hii then reply something like how are you or how can i help you  regararding appointments or something.
-               """
-              
-        
+    f"""Analyze the following user query: "{user_query}".
+    Determine the intent of the query. If the query requests information that is available in the provided {data}, respond with the appropriate information from the data.
+    If the query does not match any available information, respond with "Please provide valid information."
+    If the query does not fit any of these categories, respond with "I'm sorry, I can't provide that information. Can you ask about something else related to our services or appointments?"
+    and please note that donot return same text if you donot understand ask your queries
+    Avoid formal language; aim for a friendly and human-like tone."""
     )
     chat_completion = client.chat.completions.create(
-      model="gpt-3.5-turbo",
+      model="gpt-4",
       messages=[
-          
+         
           {
               "role": "user",
               "content": prompt,
@@ -297,8 +234,8 @@ def identify_intent_practice_question(user_query,user_data):
       ]
     )
     intent = chat_completion.choices[0].message.content.strip()
-    # print('-----',intent)
     return intent
+
 
 def edit_msg(request):
     user_response=''
@@ -1479,11 +1416,14 @@ def handle_user_query1(request,user_query):
         prompt = "Hello! How can I assist you today? Do you need help with booking an appointment or something else?"
         user_response = transform_input(prompt)
         return user_response
+    
     data = json.loads(request.body.decode('utf-8'))
     data =data.get('practice1_details', '')
-    static_response = handle_static_queries(user_query, data)
-    if static_response != "Sorry, I don't understand your request. Can you please provide more details?":
-        return static_response
+    if "static" in intent.lower():
+        static_response = identify_intent_practice_question(user_query, data)
+    # if static_response != "Sorry, I don't understand your request. Can you please provide more details?":
+        if static_response:
+            return static_response
    
     # If the intent is to book an appointment
     if "booking an appointment" in intent.lower() or "schedule appointment" in intent.lower() or "book" in intent.lower():
