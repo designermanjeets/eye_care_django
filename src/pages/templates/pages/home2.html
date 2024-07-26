@@ -106,6 +106,7 @@
     return cookieValue;
   }
 
+  const session_id = '2';
   const csrftoken = getCookie('csrftoken');
   const practice_add=` `;
   const practicde_name='First Insight Vision'; 
@@ -377,6 +378,7 @@ No
           },
           data: JSON.stringify({
               input: message,
+              session_id: session_id,
               practice_address:practice_add,
               practice_name:practicde_name,
               practice_hour:practice_hour,

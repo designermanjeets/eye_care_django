@@ -268,7 +268,9 @@ def edit_msg(request):
     else:
         print("dwhihdw",request.session['edit_msg'])
         edit_msg=request.session['edit_msg']
-        context=request.session['context']
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        context=request.session[f'context{session_id}']
         print("esgnijsg",user_response)
         prompt = (
         f"""this is my old context{context} and i want to update this context {edit_msg} using this infomation"""
@@ -285,7 +287,9 @@ def edit_msg(request):
         )
         context = chat_completion.choices[0].message.content.strip()
         # print('ecwaf----',context)
-        request.session['context']=context
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        request.session[f'context{session_id}']=context
         del request.session['edit_msg']
         del request.session['confirmation']
         return handle_user_query1(request,context)
@@ -1279,6 +1283,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         except ValueError:
             return "Failed to parse OTP validation response as JSON."
         if not validation_result.get("Isvalidated"):
+            request.session['otp'] = 'True'
             return "Invalid OTP. Please try again."
 
         
@@ -1423,6 +1428,7 @@ def handle_user_query1(request,user_query):
         static_response = identify_intent_practice_question(user_query, data)
     # if static_response != "Sorry, I don't understand your request. Can you please provide more details?":
         if static_response:
+            delete_session(request)
             return static_response
    
     # If the intent is to book an appointment
@@ -1448,9 +1454,11 @@ def handle_user_query1(request,user_query):
                     prompt = f"Please provide your a valid Email address the email you provided is not valid" 
                     user_response = transform_input(prompt)
                     # user_response="Please provide your a valid Email address the email you provided is not valid" 
-                    message=request.session['context']
+                    data = json.loads(request.body.decode('utf-8'))
+                    session_id = data.get('session_id', '')
+                    message=request.session[f'context{session_id}']
                     message=message.replace(f'{extracted_email}','')
-                    request.session['context']=message
+                    request.session[f'context{session_id}']=message
                     return user_response   
         except:
             pass
@@ -1462,9 +1470,11 @@ def handle_user_query1(request,user_query):
                 if validate_phone(extracted_PhoneNumber)==False:
                     prompt = f"Please provide your a valid Phone Number the one you provided is not valid" 
                     user_response = transform_input(prompt)
-                    message=request.session['context']
+                    data = json.loads(request.body.decode('utf-8'))
+                    session_id = data.get('session_id', '')
+                    message=request.session[f'context{session_id}']
                     message=message.replace(f'{extracted_PhoneNumber}','')
-                    request.session['context']=message
+                    request.session[f'context{session_id}']=message
                     # user_response="Please provide your a valid Phone Number the one you provided is not valid" 
                     return user_response   
         except:
@@ -1528,7 +1538,7 @@ def handle_user_query1(request,user_query):
             if request.session['confirmation'].lower() == 'no':
                 edit_response = edit_msg(request)
                 print("led",edit_response)
-                # request.session['context'] = json.dumps(extracted_info)S
+                # request.session[f'context{session_id}'] = json.dumps(extracted_info)S
                 return edit_response
 
         # Book the appointment
@@ -1551,8 +1561,8 @@ def handle_user_query1(request,user_query):
     
   #If the intent is not related to booking, generate a response using the fine-tuned model
     else:
-        response = generate_response(user_query)
-        return response
+        # response = generate_response(user_query)
+        return "njgyjy"
 
 # Main function to handle user query
 # def handle_user_query_me(request, user_query):
@@ -1605,8 +1615,15 @@ def handle_user_query1(request,user_query):
 #         response = generate_response(user_query)
 #         return response
 def delete_session(request):
+    print('hello')
+    # data = json.loads(request.body.decode('utf-8'))
+    # session_id = data.get('session_id', '')
     try:
-        del request.session['context']
+        del request.session[f'context1']
+    except:
+        print('Not able to delete context')
+    try:
+        del request.session[f'context2']
     except:
         print('Not able to delete context')
     try:
@@ -1730,24 +1747,28 @@ def func(request):
 def func1(request):
     data = json.loads(request.body.decode('utf-8'))
     message = data.get('input', '')
+    session_id = data.get('session_id', '')
     #print(message,'----------------')
     return JsonResponse({"response": 'success'})
 
 @csrf_exempt
 @require_POST
 def handle_user_query(request):
+    
     try:
         data = json.loads(request.body.decode('utf-8'))
         message = data.get('input', '')
+        session_id = data.get('session_id', '')
     except:
         message=''
+        session_id = 0
     if request.method != 'POST':
         return JsonResponse({"error": "Invalid request method"}, status=405)
     try:
         
-        request.session['context']= request.session['context'] +' '+message
+        request.session[f'context{session_id}']= request.session[f'context{session_id}'] +' '+message
     except:
-        request.session['context']=message
+        request.session[f'context{session_id}']=message
     
     try:
         # data = json.loads(request.body)
@@ -1759,8 +1780,9 @@ def handle_user_query(request):
  
         # if not isinstance(query, dict):
         #     return JsonResponse({"error": "Invalid JSON format, expected a JSON object for 'query'"}, status=400)
- 
-        input_message = request.session['context']
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        input_message = request.session[f'context{session_id}']
         if not input_message:
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 

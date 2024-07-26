@@ -102,7 +102,7 @@
     }
     return cookieValue;
   }
-
+  const session_id='1';
   const csrftoken = getCookie('csrftoken');
   const practice_add=` U.S Corporate Office
                       Rose City Eye Care 
@@ -405,6 +405,7 @@ Yes, but there is not guarantee if you get appointment or not.
           },
           data: JSON.stringify({
               input: message,
+              session_id: session_id,
               practice_address:practice_add,
               practice_name:practicde_name,
               practice_hour:practice_hour,
