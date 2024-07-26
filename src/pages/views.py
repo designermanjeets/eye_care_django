@@ -238,15 +238,17 @@ def identify_intent_practice_question(user_query,data):
 
 
 def edit_msg(request):
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')
     user_response=''
     fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
  
     try:
-        request.session['edit_msg']
+        request.session[f'edit_msg{session_id}']
     except:
-        request.session['edit_msg']='True'
+        request.session[f'edit_msg{session_id}']='True'
  
-    if request.session['edit_msg']=='True':
+    if request.session[f'edit_msg{session_id}']=='True':
         # Extract the current context from the session
         current_context = request.session.get('context', '{}')
         # print("sdfnkjg",current_context)
@@ -266,7 +268,7 @@ def edit_msg(request):
         user_response = transform_input(prompt)
         return user_response
     else:
-        edit_msg=request.session['edit_msg']
+        edit_msg=request.session[f'edit_msg{session_id}']
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         context=request.session[f'context{session_id}']
@@ -289,8 +291,8 @@ def edit_msg(request):
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         request.session[f'context{session_id}']=context
-        del request.session['edit_msg']
-        del request.session['confirmation']
+        del request.session[f'edit_msg{session_id}']
+        del request.session[f'confirmation{session_id}']
         return handle_user_query1(request,context)
    
 def greeting_handle(user_query):
@@ -825,10 +827,12 @@ def prefred_date_time_fun(response):
 
 # Tool to book appointment
 def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')
     try:
-        request.session['book_appointment']
+        request.session[f'book_appointment{session_id}']
     except:
-        request.session['book_appointment']='True'
+        request.session[f'book_appointment{session_id}']='True'
     
 
 
@@ -858,13 +862,14 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
         result+=f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})\n"
         
         valid_ids.append(location['LocationId'])
-        
-    if request.session['book_appointment']=='True':  
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')    
+    if request.session[f'book_appointment{session_id}']=='True':  
        result=f" Choose a location by entering the ID: {result}"
        return result
-    # location_id = transform_input(f"{request.session['book_appointment']}")
-    location_id = request.session['book_appointment']
-    #print(request.session['book_appointment'],'===============================',location_id)
+    # location_id = transform_input(f"{request.session[f'book_appointment{session_id}']}")
+    location_id = request.session[f'book_appointment{session_id}']
+    #print(request.session[f'book_appointment{session_id}'],'===============================',location_id)
 
     
     if location_id:
@@ -884,9 +889,13 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
     except ValueError:
         return "Failed to parse providers response as JSON."
     try:
-        print(request.session['provider_id'],'-----------------------------')
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        print(request.session[f'provider_id{session_id}'],'-----------------------------')
     except:
-        request.session['provider_id']='True'
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        request.session[f'provider_id{session_id}']='True'
     
     print("Available providers:")
     result=''
@@ -894,14 +903,15 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
         
         result+=f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})\n"
    
-
-    if request.session['provider_id']=='True':  
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')
+    if request.session[f'provider_id{session_id}']=='True':  
        
        result=f" {transform_input('Choose a provider by entering the ID: ')} {result}"
        return result
     
     # provider_id = input(transform_input("Choose a provider by entering the ID: "))
-    provider_id = request.session['provider_id']
+    provider_id = request.session[f'provider_id{session_id}']
 
     # Step 3: Get the appointment reasons for the selected provider and location
     get_reasons_url = f"https://iochatbot.maximeyes.com/api/appointment/appointmentreasonsForChatBot?LocationId={location_id}&SCHEDULE_RESOURCE_ID={provider_id}"
@@ -919,19 +929,19 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
     except ValueError:
         return "Failed to parse appointment reasons response as JSON."
     try:
-        request.session['reason_id']
+        request.session[f'reason_id{session_id}']
     except:
-        request.session['reason_id']='True'
+        request.session[f'reason_id{session_id}']='True'
     print("Available reasons:")
     result=''
     for idx, reason in enumerate(reasons):
         #print(f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})")
         result+=f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})\n"
-    if request.session['reason_id']=='True':  
+    if request.session[f'reason_id{session_id}']=='True':  
        result=f" {transform_input('Choose a reason by entering the ID: ')} {result}"
        return result
 
-    reason_id = request.session['reason_id']
+    reason_id = request.session[f'reason_id{session_id}']
     # reason_id = input(transform_input("Choose a reason by entering the ID: "))
 
     # Step 4: Get the open slots for the selected location, provider, and reason
@@ -955,18 +965,18 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
     except ValueError:
         return "Failed to parse open slots response as JSON."
     try:
-        request.session['slot_id']
+        request.session[f'slot_id{session_id}']
     except:
-        request.session['slot_id']='True'
+        request.session[f'slot_id{session_id}']='True'
     #print("Available open slots:")
     result=''
     for idx, slot in enumerate(open_slots):
         #print(f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})")
         result+=f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})"
-    if request.session['slot_id']=='True':  
+    if request.session[f'slot_id{session_id}']=='True':  
        result=f" {transform_input('Choose an open slot by entering the ID:  ')} {result}"
        return result
-    open_slot_id = request.session['slot_id']
+    open_slot_id = request.session[f'slot_id{session_id}']
     # open_slot_id = input(transform_input("Choose an open slot by entering the ID: "))
 
     # Step 5: Send OTP
@@ -989,14 +999,14 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
     try:
         request.session['otp']
     except:
-        request.session['otp']='True'
+        request.session[f'otp{session_id}']='True'
     result=''
-    if request.session['otp']=='True':  
+    if request.session[f'otp{session_id}']=='True':  
        result=f" {transform_input('Enter the OTP received: ')} "
        return result
-    open_slot_id = request.session['slot_id']
+    open_slot_id = request.session[f'slot_id{session_id}']
     #print("open_slot_id",open_slot_id)
-    otp = request.session['otp']
+    otp = request.session[f'otp{session_id}']
     # otp = input(transform_input("Enter the OTP received: "))
 
     # Step 6: Validate OTP
@@ -1056,10 +1066,12 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
     return "Appointment scheduled successfully."
 
 def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber, Email, prefred_date_time):
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')
     try:
-        request.session['book_appointment']
+        request.session[f'book_appointment{session_id}']
     except:
-        request.session['book_appointment'] = 'True'
+        request.session[f'book_appointment{session_id}'] = 'True'
  
     headers = {
         'Content-Type': 'application/json',
@@ -1086,15 +1098,16 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     for idx, location in enumerate(locations):
         result += f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})\n"
         valid_ids+= ' '+ (str(location['LocationId']).strip())
-        
-    if request.session['book_appointment'] == 'True':
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')    
+    if request.session[f'book_appointment{session_id}'] == 'True':
 
         result = f"Choose a location by entering the ID: {result}"
         return result
-    if str(request.session['book_appointment']) in valid_ids:
-        location_id = request.session['book_appointment']
+    if str(request.session[f'book_appointment{session_id}']) in valid_ids:
+        location_id = request.session[f'book_appointment{session_id}']
     else:
-        request.session['book_appointment'] = 'True'
+        request.session[f'book_appointment{session_id}'] = 'True'
 
         return f"""Invalid location ID. 
                 choose a valid location by entering the ID. {result} """
@@ -1118,9 +1131,13 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     except ValueError:
         return "Failed to parse providers response as JSON."
     try:
-        print(request.session['provider_id'], '-----------------------------')
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        print(request.session[f'provider_id{session_id}'], '-----------------------------')
     except:
-        request.session['provider_id'] = 'True'
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        request.session[f'provider_id{session_id}'] = 'True'
    
     print("Available providers:")
     result = ''
@@ -1128,13 +1145,16 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     for idx, provider in enumerate(providers):
         result += f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})\n"
         valid_ids+= ' '+ (str(provider['ScheduleResourceId']).strip())
-    if request.session['provider_id'] == 'True':
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')
+    if request.session[f'provider_id{session_id}'] == 'True':
         result = f"Choose a provider by entering the ID: {result}"
         return result
-    if str(request.session['provider_id']) in valid_ids:
-        provider_id = request.session['provider_id']
+    
+    if str(request.session[f'provider_id{session_id}']) in valid_ids:
+        provider_id = request.session[f'provider_id{session_id}']
     else:
-        request.session['provider_id'] = 'True'
+        request.session[f'provider_id{session_id}'] = 'True'
         return f"""Invalid provider ID. 
                 choose a valid provider by entering the ID. {result} """
  
@@ -1153,22 +1173,22 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     except ValueError:
         return "Failed to parse appointment reasons response as JSON."
     try:
-        request.session['reason_id']
+        request.session[f'reason_id{session_id}']
     except:
-        request.session['reason_id'] = 'True'
+        request.session[f'reason_id{session_id}'] = 'True'
     print("Available reasons:")
     result = ''
     valid_ids=''
     for idx, reason in enumerate(reasons):
         result += f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})\n"
         valid_ids+= ' '+ (str(reason['ReasonId']).strip())
-    if request.session['reason_id'] == 'True':
+    if request.session[f'reason_id{session_id}'] == 'True':
         result = f"Choose a reason by entering the ID: {result}"
         return result
-    if str(request.session['reason_id']) in valid_ids:
-        reason_id = request.session['reason_id']
+    if str(request.session[f'reason_id{session_id}']) in valid_ids:
+        reason_id = request.session[f'reason_id{session_id}']
     else:
-        request.session['reason_id'] = 'True'
+        request.session[f'reason_id{session_id}'] = 'True'
         return f"""Invalid reason ID. 
                 choose a valid reason by entering the ID. {result} """
  
@@ -1179,9 +1199,32 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     if 'Date is in the past' in preferred:
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
+
+
         message=request.session[f'context{session_id}']
-        message=message.replace(prefred_date_time,'')
+        
+
+        prompt = (
+        f"""You are given a text with a placeholder for a preferred date and time. Your task is to remove the placeholder `{prefred_date_time}` from the text while keeping the rest of the content exactly as it is. Here is the text with the placeholder included:
+
+            "{message}"
+
+            Please remove the placeholder `{prefred_date_time}` and return the updated text without changing anything else."""
+           
+        )
+        chat_completion = client.chat.completions.create(
+        model="gpt-4",
+        # model="gpt-3.5-turbo",
+        messages=[
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ]
+        )
+        message = chat_completion.choices[0].message.content.strip()
         request.session[f'context{session_id}']=message
+        print(message,'====================+')
         return 'Please provide a valid date time for Appointment'
     
     print("Preferred date time", preferred)
@@ -1202,22 +1245,22 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     except ValueError:
         return "Failed to parse open slots response as JSON."
     try:
-        request.session['slot_id']
+        request.session[f'slot_id{session_id}']
     except:
-        request.session['slot_id'] = 'True'
+        request.session[f'slot_id{session_id}'] = 'True'
     print("Available open slots:")
     result = ''
     valid_ids=[]
     for idx, slot in enumerate(open_slots):
         result += f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})\n"
         valid_ids.append(str(slot['OpenSlotId']).strip())
-    if request.session['slot_id'] == 'True':
+    if request.session[f'slot_id{session_id}'] == 'True':
         result = f"Choose an open slot by entering the ID: {result}"
         return result
-    if str(request.session['slot_id']).strip() in valid_ids:
-        open_slot_id = request.session['slot_id']
+    if str(request.session[f'slot_id{session_id}']).strip() in valid_ids:
+        open_slot_id = request.session[f'slot_id{session_id}']
     else:
-        request.session['slot_id'] = 'True'
+        request.session[f'slot_id{session_id}'] = 'True'
         return f"""Invalid slot ID. 
                 choose a valid slot by entering the ID. {result} """
  
@@ -1239,11 +1282,11 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
 
 
     try:
-        print(request.session['confirmation'],'======================')
+        print(request.session[f'confirmation{session_id}'],'======================')
     except:
-        request.session['confirmation'] = 'True'
+        request.session[f'confirmation{session_id}'] = 'True'
     
-    if request.session['confirmation'] == "True":
+    if request.session[f'confirmation{session_id}'] == "True":
         return confirmation_message
     
     # Step 6: If user confirms, send OTP
@@ -1251,7 +1294,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
 
 
 
-    if request.session['confirmation'] == 'yes':
+    if request.session[f'confirmation{session_id}'] == 'yes':
         send_otp_url = "https://iochatbot.maximeyes.com/api/common/sendotp"
         otp_payload = {
             "FirstName": FirstName,
@@ -1270,14 +1313,14 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
             return f"Failed to send OTP. Status code: {otp_response.status_code}"
  
         try:
-            request.session['otp']
+            request.session[f'otp{session_id}']
         except:
-            request.session['otp'] = 'True'
+            request.session[f'otp{session_id}'] = 'True'
         result = ''
-        if request.session['otp'] == 'True':
+        if request.session[f'otp{session_id}'] == 'True':
             result = f"Enter the OTP received: "
             return result
-        otp = request.session['otp']
+        otp = request.session[f'otp{session_id}']
  
         # Step 7: Validate OTP
         validate_otp_url = "https://iochatbot.maximeyes.com/api/common/checkotp"
@@ -1298,14 +1341,14 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         except ValueError:
             return "Failed to parse OTP validation response as JSON."
         if not validation_result.get("Isvalidated"):
-            request.session['otp'] = 'True'
+            request.session[f'otp{session_id}'] = 'True'
             return "Invalid OTP. Please try again."
 
         
     
  
         
-    elif request.session['confirmation'] == 'no':
+    elif request.session[f'confirmation{session_id}'] == 'no':
         msg=edit_msg(request)
         return msg
 
@@ -1383,9 +1426,11 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
             
             """
         print(result)
-        result= transform_input(result)
+        # result= transform_input(result)
         result=result+'\n'+'Thanks, Have a great day! '
-        delete_session(request)
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        del request.session[f'context{session_id}']
         return result
     
     
@@ -1551,7 +1596,7 @@ def handle_user_query1(request,user_query):
 
        
         if 'confirmation' in request.session:
-            if request.session['confirmation'].lower() == 'no':
+            if request.session[f'confirmation{session_id}'].lower() == 'no':
                 edit_response = edit_msg(request)
                 print("led",edit_response)
                 # request.session[f'context{session_id}'] = json.dumps(extracted_info)S
@@ -1645,23 +1690,43 @@ def delete_session(request):
     except:
         print('Not able to delete context')
     try:
-        del request.session['book_appointment']
+        del request.session['book_appointment1']
     except:
         print('Not able to delete book_appointment')
     try:
-        del request.session['provider_id']
+        del request.session['book_appointment2']
+    except:
+        print('Not able to delete book_appointment')
+    try:
+        del request.session['provider_id1']
     except:
         print('Not able to delete provider_id')
     try:
-        del request.session['reason_id']
+        del request.session['provider_id2']
+    except:
+        print('Not able to delete provider_id')
+    try:
+        del request.session['reason_id1']
     except:
         print('Not able to delete reason_id')
     try:
-        del request.session['slot_id']
+        del request.session['reason_id2']
+    except:
+        print('Not able to delete reason_id')
+    try:
+        del request.session['slot_id1']
     except:
         print('Not able to delete slot_id')
     try:
-        del request.session['otp']
+        del request.session['slot_id2']
+    except:
+        print('Not able to delete slot_id')
+    try:
+        del request.session['otp1']
+    except:
+        print('Not able to delete otp')
+    try:
+        del request.session['otp2']
     except:
         print('Not able to delete otp')
     try:
@@ -1669,7 +1734,11 @@ def delete_session(request):
     except:
         print('Not able to delete return_response')
     try:
-        del request.session['confirmation']
+        del request.session['confirmation1']
+    except:
+        print('Not able to delete confirmation')
+    try:
+        del request.session['confirmation2']
     except:
         print('Not able to delete confirmation')
     try:
@@ -1677,7 +1746,11 @@ def delete_session(request):
     except:
         print('Not able to delete appointment_scheduled')
     try:
-        del request.session['edit_msg']
+        del request.session['edit_msg1']
+    except:
+        print('Not able to edit_msg')
+    try:
+        del request.session['edit_msg2']
     except:
         print('Not able to edit_msg')
     print('all session deleted deleted')
@@ -1713,47 +1786,49 @@ def func(request):
     
     if request.method=='POST':
         data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
         message = data.get('input', '')
         querry=message
         
-        if  request.session.get('book_appointment')=='True':
+        if  request.session.get(f'book_appointment{session_id}')=='True':
             try:
-                request.session['book_appointment']=message
+                request.session[f'book_appointment{session_id}']=message
             except:
                 print('Not able select location')
-        if  request.session.get('provider_id')=='True':
+
+        if  request.session.get(f'provider_id{session_id}')=='True':
             try:
-                request.session['provider_id']=message
+                request.session[f'provider_id{session_id}']=message
             except:
                 print('Not able select privider')
-        if  request.session.get('reason_id')=='True':
+        if  request.session.get(f'reason_id{session_id}')=='True':
             try:
-                request.session['reason_id']=message
+                request.session[f'reason_id{session_id}']=message
             except:
                 print('Not able select reason')
-        if  request.session.get('slot_id')=='True':
+        if  request.session.get(f'slot_id{session_id}')=='True':
             try:
-                request.session['slot_id']=message
+                request.session[f'slot_id{session_id}']=message
             except:
                 print('Not able select slot')
-        if  request.session.get('confirmation')=='True':
+        if  request.session.get(f'confirmation{session_id}')=='True':
             try:
-                request.session['confirmation']=message
+                request.session[f'confirmation{session_id}']=message
             except:
                 print('Not able to confirm')
-        if  request.session.get('otp')=='True':
+        if  request.session.get(f'otp{session_id}')=='True':
             try:
-                request.session['otp']=message
+                request.session[f'otp{session_id}']=message
             except:
                 print('Not able select otp')
-        if  request.session.get('edit_msg')=='True':
+        if  request.session.get(f'edit_msg{session_id}')=='True':
             try:
-                request.session['edit_msg']=message
+                request.session[f'edit_msg{session_id}']=message
             except:
                 print('Not able edit_msg')
         if  request.session.get('edit_msg')=='True':
             try:
-                request.session['edit_msg']=message
+                request.session[f'edit_msg{session_id}']=message
             except:
                 print('Not able edit_msg')
         
@@ -1804,9 +1879,9 @@ def handle_user_query(request):
         if not input_message:
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 
-        if True:
+        try:
             response = handle_user_query1(request,input_message)
-        else:
+        except:
             print('error in handle_user_query1')
             data = json.loads(request.body.decode('utf-8'))
             response = f"please contact our support team :{data.get('practice_email', '')}"
