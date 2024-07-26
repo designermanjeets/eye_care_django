@@ -25,7 +25,7 @@ load_dotenv()
 
 # Initialize the OpenAI client
 # open_api_key = os.getenv("OPENAI_API_KEY")
-open_api_key = ''
+open_api_key = ' '
 
 client = OpenAI(api_key=open_api_key)
 
@@ -1458,7 +1458,7 @@ def validate_email(email):
           return re.match(pattern, email) is not None
 def validate_phone(phone):
     # Regular expression pattern for a valid US phone number
-    pattern = r'^\d{10}$'
+    pattern = r'^\d{10}$|^\(\d{3}\) \d{3}-\d{4}$'
     return re.match(pattern, phone) is not None
 def handle_user_query1(request,user_query):
     # Identify the user's intent
@@ -1484,12 +1484,14 @@ def handle_user_query1(request,user_query):
         return user_response
     
     data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')
     data =data.get('practice1_details', '')
     if "static" in intent.lower():
         static_response = identify_intent_practice_question(user_query, data)
     # if static_response != "Sorry, I don't understand your request. Can you please provide more details?":
         if static_response:
-            delete_session(request)
+            # del request.session[f'context{session_id}']
+            delete_session(request,session_id)
             return static_response
    
     # If the intent is to book an appointment
@@ -1610,8 +1612,10 @@ def handle_user_query1(request,user_query):
         #     book_appt=f"Please  contact : {data.get('practice_email', '')} "
         
         try:
+            data=json.loads(request.body.decode('utf-8'))
+            session_id = data.get('session_id', '')
             if 'Appointment scheduled successfully' in book_appt:
-                # delete_session(request)
+                delete_session(request,session_id)
                 print('Appointment scheduled successfully---')
                 pass
         except:
@@ -1677,82 +1681,103 @@ def handle_user_query1(request,user_query):
 #     else:
 #         response = generate_response(user_query)
 #         return response
-def delete_session(request):
+def delete_session(request,session_id):
     print('hello')
     # data = json.loads(request.body.decode('utf-8'))
     # session_id = data.get('session_id', '')
-    try:
-        del request.session[f'context1']
-    except:
-        print('Not able to delete context')
-    try:
-        del request.session[f'context2']
-    except:
-        print('Not able to delete context')
-    try:
-        del request.session['book_appointment1']
-    except:
-        print('Not able to delete book_appointment')
-    try:
-        del request.session['book_appointment2']
-    except:
-        print('Not able to delete book_appointment')
-    try:
-        del request.session['provider_id1']
-    except:
-        print('Not able to delete provider_id')
-    try:
-        del request.session['provider_id2']
-    except:
-        print('Not able to delete provider_id')
-    try:
-        del request.session['reason_id1']
-    except:
-        print('Not able to delete reason_id')
-    try:
-        del request.session['reason_id2']
-    except:
-        print('Not able to delete reason_id')
-    try:
-        del request.session['slot_id1']
-    except:
-        print('Not able to delete slot_id')
-    try:
-        del request.session['slot_id2']
-    except:
-        print('Not able to delete slot_id')
-    try:
-        del request.session['otp1']
-    except:
-        print('Not able to delete otp')
-    try:
-        del request.session['otp2']
-    except:
-        print('Not able to delete otp')
-    try:
-        del request.session['return_response']
-    except:
-        print('Not able to delete return_response')
-    try:
-        del request.session['confirmation1']
-    except:
-        print('Not able to delete confirmation')
-    try:
-        del request.session['confirmation2']
-    except:
-        print('Not able to delete confirmation')
-    try:
-        del request.session['appointment_scheduled']
-    except:
-        print('Not able to delete appointment_scheduled')
-    try:
-        del request.session['edit_msg1']
-    except:
-        print('Not able to edit_msg')
-    try:
-        del request.session['edit_msg2']
-    except:
-        print('Not able to edit_msg')
+    if session_id=='2':
+
+        try:
+            del request.session[f'context2']
+        except:
+            print('Not able to delete context')
+        try:
+            del request.session['book_appointment2']
+        except:
+            print('Not able to delete book_appointment')
+        try:
+            del request.session['provider_id2']
+        except:
+            print('Not able to delete provider_id')
+        try:
+            del request.session['reason_id2']
+        except:
+            print('Not able to delete reason_id')
+        try:
+            del request.session['slot_id2']
+        except:
+            print('Not able to delete slot_id')
+        try:
+            del request.session['otp2']
+        except:
+            print('Not able to delete otp')
+        try:
+            del request.session['confirmation2']
+        except:
+            print('Not able to delete confirmation')
+        try:
+            del request.session['edit_msg2']
+        except:
+            print('Not able to edit_msg')
+        try:
+            del request.session['return_response2']
+        except:
+            print('Not able to delete return_response')
+        try:
+            del request.session['appointment_scheduled2']
+        except:
+            print('Not able to delete appointment_scheduled')
+
+
+    elif session_id=='1':
+        try:
+            del request.session[f'context1']
+        except:
+            print('Not able to delete context')
+    
+        try:
+            del request.session['book_appointment1']
+        except:
+            print('Not able to delete book_appointment')
+        
+        try:
+            del request.session['provider_id1']
+        except:
+            print('Not able to delete provider_id')
+        
+        try:
+            del request.session['reason_id1']
+        except:
+            print('Not able to delete reason_id')
+        
+        try:
+            del request.session['slot_id1']
+        except:
+            print('Not able to delete slot_id')
+    
+        try:
+            del request.session['otp1']
+        except:
+            print('Not able to delete otp')
+        
+        try:
+            del request.session['return_response1']
+        except:
+            print('Not able to delete return_response')
+        try:
+            del request.session['confirmation1']
+        except:
+            print('Not able to delete confirmation')
+    
+        try:
+            del request.session['appointment_scheduled1']
+        except:
+            print('Not able to delete appointment_scheduled')
+        try:
+            del request.session['edit_msg1']
+        except:
+            print('Not able to edit_msg')
+    
     print('all session deleted deleted')
     return request
 
@@ -1765,7 +1790,7 @@ def home(request):
     }
     if request.method=='GET':
         
-        delete_session(request)
+        delete_session(request,'1')
        
     return render(request, "pages/home.html", context)
 def home2(request):
@@ -1777,7 +1802,7 @@ def home2(request):
         # "python_ver": os.environ["PYTHON_VERSION"],
     }
     if request.method=='GET':
-        delete_session(request)
+        delete_session(request,'2')
     return render(request, "pages/home2.html", context)
     
 @csrf_exempt
@@ -1893,7 +1918,7 @@ def handle_user_query(request):
             response=f"Please contact :{data.get('practice_email', '')} "
             return response
 
-            response = generate_response(input_message)
+            # response = generate_response(input_message)
         return response
         # return JsonResponse({"response": response})
    
