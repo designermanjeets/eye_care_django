@@ -39,9 +39,10 @@ account_password = os.getenv("AccountPassword")
 def print_model_structure(model):
     for name, module in model.named_modules():
         print(name)
-print("Base model structure:")
+print("Base model structure : ")
 
 # Define the function to call the Hugging Face endpoint
+
 def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_factor=0.3):
     headers = {
         "Authorization": f"Bearer {api_token}",
@@ -137,15 +138,28 @@ def fetch_info_openai(response):
 
 # Function to identify intent
 def identify_intent(user_query):
-    prompt = (
-        f"""Identify the intent of the following query: "{user_query}".
+    # prompt = (
+    #     f"""Identify the intent of the following query: "{user_query}".
  
-        If the query is related to a greeting, respond with "Hello, how can I help you?".
-        Is it related to book an appointment, rescheduling an appointment, canceling an appointment, or something else? And also check the appointment date and time
-        Also, check if the query includes an appointment date and time, if applicable."""
-    )
-    print("prompt", prompt)
-
+    #     If the query is related to a greeting, respond with "Hello, how can I help you? reagardung appointments".
+    #     Is it related to book an appointment, rescheduling an appointment, canceling an appointment, or something else? And also check the appointment date and time
+    #     Also, check if the query includes an appointment date and time, if applicable."""
+    # # )
+    # prompt=(f"""Given the following user query: "{user_query}", perform the following tasks:
+    #     Identify the primary intent of the query. Determine if it is a greeting, a request to book an appointment, reschedule an appointment, cancel an appointment, or another type of inquiry.
+    #     If the query is a greeting, respond with "Hello, how can I help you regarding appointments? or any other ques related to this".
+    #     Check if the query includes any specific appointment date and time details. If applicable, extract and validate this information.""")
+    prompt=(f"""Given the following user query: "{user_query}", perform the following tasks:
+            Identify the primary intent of the query. Determine if it is:
+            A greeting
+            A request to book an appointment
+            Reschedule an appointment
+            Cancel an appointment
+            A request for static information (e.g., office timings, address)
+            Another type of inquiry 
+            If the query is a greeting, respond with "Hello, how can I help you regarding appointments?".
+            If the query is a request for static information, respond with the appropriate details (e.g., office timings, address).
+            Check if the query includes any specific appointment date and time details. If applicable, extract and validate this information.""")
     retries = 3
     backoff_factor = 0.3
 
@@ -162,7 +176,7 @@ def identify_intent(user_query):
             )
             # Extract the intent from the response
             intent = chat_completion.choices[0].message.content.strip()
-            print("intent", intent)
+            # print("regnskj",intent)
             return intent
         except requests.exceptions.RequestException as e:
             if attempt < retries - 1:
@@ -176,8 +190,87 @@ def identify_intent(user_query):
             print(f"An unexpected error occurred: {e}")
             return "Error: An unexpected error occurred while identifying intent."
 
+def handle_static_queries(user_query, static_data):
+    # Convert the query to lowercase for case-insensitive matching
+    query_lower = user_query.lower()
+
+    # Static data dictionary
+    static_data = {
+        "practice_name": "Rose City Eye Care",
+        "practice_hours": "8 AM to 8 PM PST",
+        "practice_email": "RoseCity@gmail.com",
+        "address_us": """U.S Corporate Office
+                         Rose City Eye Care
+                         6723 NE Bennett Street
+                         Suite 200
+                         Hillsboro, Oregon 97124""",
+        "address_india": """India Offices
+                            Rose City Eye Care
+                            2nd Floor, Server Space,
+                            AG Technology Park
+                            Off ITI Road
+                            Survey No. 127/1A
+                            Plot No. 8
+                            Aundh, Pune – 411 007""",
+        "insurance_coverage": "https://www.first-insight.com/",
+        "providers": """Dr Anderson (Pediatrics)
+                        Dr. Anderson has 12 Years of extensive experience in Pediatric eye surgeries
+                        Dr. John (Surgeon)""",
+        "services": """OPD
+                       Cataract Surgery
+                       Glaucoma""",
+        "products": """Complete Eye check up: $200
+                       Comprehensive Eye checkup: $100""",
+        "parking_instructions": "Please park your vehicle in parking at L1 level reserved for our clinic",
+        "what_to_bring": "Last medical report, Insurance card copy",
+        "cancellation_policy": "Refer google.com for cancellation policy",
+        "payment_types": """VISA, Credit card, Gpay, Cash, CareCredit""",
+        "financing_options": "Yes, With several credit cards we do provide EMI options",
+        "languages_spoken": "Spanish, English",
+        "accessible_facilities": "Yes",
+        "discounts": "Yes, we offer a 10% discount for Military employees",
+        "online_paperwork": "Yes, please visit https://intake.maximeyes.com to fill intake forms",
+        "online_payments": """Yes, we support VISA Credit card, Gpay, Cash""",
+        "online_booking": "Yes, https://booking.max.com",
+        "arrive_early": "No",
+        "wait_list": "Yes, but there is no guarantee of an appointment"
+    }
+
+    # Keywords for static data
+    static_keywords = {
+        "name": "practice_name",
+        "hours": "practice_hours",
+        "email": "practice_email",
+        "address": "address_us",  # You might need to distinguish between US and India addresses
+        "insurance": "insurance_coverage",
+        "providers": "providers",
+        "services": "services",
+        "products": "products",
+        "parking": "parking_instructions",
+        "bring": "what_to_bring",
+        "cancellation": "cancellation_policy",
+        "payment": "payment_types",
+        "financing": "financing_options",
+        "languages": "languages_spoken",
+        "accessibility": "accessible_facilities",
+        "discounts": "discounts",
+        "paperwork": "online_paperwork",
+        "payments": "online_payments",
+        "booking": "online_booking",
+        "arrive": "arrive_early",
+        "wait": "wait_list"
+    }
+
+    for keyword, data_key in static_keywords.items():
+            if re.search(r'\b' + re.escape(keyword) + r'\b', query_lower):
+                return static_data.get(data_key, "Sorry, I don't have that information.")
+        
+    return "Sorry, I don't understand your request. Can you please provide more details?"
+
+
+
 def identify_intent_practice_question(user_query,user_data):
-    print(user_data)
+    # print(user_data)
     prompt = (
         # f"""Identify the intent of this query :  "{user_query}".
         # and if it is asking for an address, email , or work timimg  or name reply me in a single word only as address for address, name for name, email for email, hours for work timing or working hours or simillar
@@ -204,7 +297,7 @@ def identify_intent_practice_question(user_query,user_data):
       ]
     )
     intent = chat_completion.choices[0].message.content.strip()
-    print('-----',intent)
+    # print('-----',intent)
     return intent
 
 def edit_msg(request):
@@ -219,7 +312,7 @@ def edit_msg(request):
     if request.session['edit_msg']=='True':
         # Extract the current context from the session
         current_context = request.session.get('context', '{}')
-        print("sdfnkjg",current_context)
+        # print("sdfnkjg",current_context)
    
         # Convert context from JSON string to dictionary if necessary
         if isinstance(current_context, str):
@@ -254,7 +347,7 @@ def edit_msg(request):
         ]
         )
         context = chat_completion.choices[0].message.content.strip()
-        print('ecwaf----',context)
+        # print('ecwaf----',context)
         request.session['context']=context
         del request.session['edit_msg']
         del request.session['confirmation']
@@ -586,158 +679,203 @@ def prefred_date_time_fun1(response):
         return None
 
 def prefred_date_time_fun(response):
-  print("response12",response)
-  if "next" in response.lower() or "comming" in response.lower() or "upcomming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
-        def get_next_weekday(day_name, use_next=False):
-            # Dictionary to convert day names to weekday numbers
-            days_of_week = {
-                'monday': 0,
-                'tuesday': 1,
-                'wednesday': 2,
-                'thursday': 3,
-                'friday': 4,
-                'saturday': 5,
-                'sunday': 6
-            }
- 
-            # Get today's date and the current weekday
-            today = datetime.now()
-            current_weekday = today.weekday()
- 
-            # Convert the day name to a weekday number
-            target_weekday = days_of_week[day_name.lower()]
- 
-            # Calculate the number of days until the next target weekday
-            days_until_target = (target_weekday - current_weekday + 7) % 7
-            if days_until_target == 0 or use_next:
-                days_until_target += 7
- 
-            # Calculate the date for the next target weekday
+    print("response12",response)
+    def get_next_weekday(day_name, use_next=False):
+    # Dictionary to convert day names to weekday numbers
+        days_of_week = {
+            'monday': 0, 'mon': 0,
+            'tuesday': 1, 'tues': 1,
+            'wednesday': 2, 'wed': 2,
+            'thursday': 3, 'thurs': 3,
+            'friday': 4, 'fri': 4,
+            'saturday': 5, 'sat': 5,
+            'sunday': 6, 'sun': 6
+        }
+
+        # Get today's date and the current weekday
+        today = datetime.now()
+        current_weekday = today.weekday()
+
+        # Convert the day name to a weekday number
+        target_weekday = days_of_week[day_name.lower()]
+
+        # Calculate the number of days until the next target weekday
+        days_until_target = (target_weekday - current_weekday + 7) % 7
+
+        if days_until_target == 0 or use_next:
+            days_until_target += 7
+
+        # Calculate the date for the next target weekday
+        next_weekday = today + timedelta(days=days_until_target)
+        return next_weekday
+
+    def get_upcoming_weekday(day_name):
+        # Dictionary to convert day names to weekday numbers
+        days_of_week = {
+            'monday': 0, 'mon': 0,
+            'tuesday': 1, 'tues': 1,
+            'wednesday': 2, 'wed': 2,
+            'thursday': 3, 'thurs': 3,
+            'friday': 4, 'fri': 4,
+            'saturday': 5, 'sat': 5,
+            'sunday': 6, 'sun': 6
+        }
+        # Get today's date and the current weekday
+        today = datetime.now()
+        current_weekday = today.weekday()
+
+        # Convert the day name to a weekday number
+        target_weekday = days_of_week[day_name.lower()]
+
+        # Calculate the number of days until the upcoming target weekday
+        days_until_target = (target_weekday - current_weekday + 7) % 7
+
+        # If the day is today and has not passed, use today's date
+        if days_until_target == 0:
+            next_weekday = today
+        else:
             next_weekday = today + timedelta(days=days_until_target)
- 
-            return next_weekday
- 
-        def get_relative_day(keyword):
-            today = datetime.now()
-            if keyword == "tomorrow":
-                return today + timedelta(days=1)
-            elif keyword == "day after tomorrow":
-                return today + timedelta(days=2)
-            return None
- 
+            
+        return next_weekday
+
+    def get_relative_day(keyword):
+        today = datetime.now()
+        if keyword == "tomorrow":
+            return today + timedelta(days=1)
+        elif keyword == "day after tomorrow":
+            return today + timedelta(days=2)
+        return None
+
+    def extract_date_from_response(response):
         keywords = ["next", "coming", "upcoming", "tomorrow", "day after tomorrow"]
-        use_next = any(keyword in response for keyword in ["next", "coming", "upcoming"])
- 
+        use_next = any(keyword in response.lower() for keyword in ["next", "coming"])
+        use_upcoming = "upcoming" in response.lower()
+
         # Check for "tomorrow" and "day after tomorrow"
         relative_day = None
         for keyword in ["tomorrow", "day after tomorrow"]:
-            if keyword in response:
+            if keyword in response.lower():
                 relative_day = get_relative_day(keyword)
-                response = response.replace(keyword, "").strip()
+                response = re.sub(keyword, "", response, flags=re.IGNORECASE).strip()
                 break
- 
+
+        # Extract the day name from the response
+        day_name_match = re.search(r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues|wed|thurs|fri|sat|sun)\b', response, re.IGNORECASE)
+        if day_name_match:
+            day_name = day_name_match.group(0)
+        else:
+            day_name = None
+
         if relative_day:
-            if response:
+            if day_name:
                 # If there's a specific day mentioned, calculate from the relative day
-                next_day = get_next_weekday(response)
+                next_day = get_next_weekday(day_name)
                 if next_day <= relative_day:
                     next_day += timedelta(days=7)
-                return (next_day.strftime("%Y-%m-%dT%H:%M:%S"))
+                return next_day.strftime("%Y-%m-%dT%H:%M:%S")
             else:
-                return (relative_day.strftime("%Y-%m-%dT%H:%M:%S"))
+                return relative_day.strftime("%Y-%m-%dT%H:%M:%S")
         else:
             # Remove the keyword from the input if it exists
             for keyword in ["next", "coming", "upcoming"]:
-                response = response.replace(keyword, "").strip()
- 
-            # Get the next occurrence of the specified day
-            next_day = get_next_weekday(response, use_next)
-            return next_day.strftime("%Y-%m-%dT%H:%M:%S")
- 
-  else:
-    print("response============================",response)
-    response=response.replace(',','')
-    patterns = [
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
-        (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
-        (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4})\b', '%d %B %Y'),
-        (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (\d{4})\b','%B %d %Y'), # Added this line
-        (r'\b(\d{1,2}) (AM|PM)\b', None),
-        (r'\b(Morning|Afternoon|Evening|Night)\b', None),
-        (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m/%d/%Y'),
-        (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m-%d-%Y'),
-        (r'\b(\d{4})-(\d{2})-(\d{1,2})\b', '%Y-%m-%d'),
-        (r'\b(\d{2})/(\d{1,2})/(\d{4})\b', '%m/%d/%Y'),
-        (r'\b(\d{4})/(\d{2})/(\d{1,2})\b', '%Y/%m/%d'),
-        (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d, %Y'),
-        (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d %Y'),
-        (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4})\b', '%b %d, %Y'),
-        (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4})\b', '%b %d %Y'),
-        (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %b %Y'),
-        (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4})\b', '%d %b %Y'),
-]
-   
-   
-    # Time mappings for periods of the day
-    time_mappings = {
-        "Morning": 9,
-        "Afternoon": 15,
-        "Evening": 18,
-        "Night": 21
-    }
-   
-    datetime_obj = None
-   
-    for pattern, date_format in patterns:
-        print(response,'response++')
-        match = re.search(pattern, response)
-        
-        if match:
-            groups = match.groups()
-            if date_format:
-                print(match,'match')
-                date_str = ' '.join(groups[:3])
-                print(date_str,'date_str')
-                datetime_obj = datetime.strptime(date_str, date_format)
-                if len(groups) == 4:  # If there's a time of day
-                    period = groups[3]
-                    hour = time_mappings.get(period, 12)
-                    datetime_obj = datetime_obj.replace(hour=hour)
-                break
+                response = re.sub(keyword, "", response, flags=re.IGNORECASE).strip()
+
+            if day_name:
+                if use_upcoming:
+                    next_day = get_upcoming_weekday(day_name)
+                else:
+                    next_day = get_next_weekday(day_name, use_next)
+                return next_day.strftime("%Y-%m-%dT%H:%M:%S")
             else:
-                if len(groups) == 2 and groups[1] in ["AM", "PM"]:
-                    hour, am_pm = groups
-                    hour = int(hour)
-                    if am_pm == 'PM' and hour != 12:
-                        hour += 12
-                    elif am_pm == 'AM' and hour == 12:
-                        hour = 0
-                    if datetime_obj:
+                return "No valid day found in the response"
+    if "next" in response.lower() or "coming" in response.lower() or "upcoming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
+        return extract_date_from_response(response)
+
+    else:
+        # print("response============================",response)
+        response=response.replace(',','')
+        patterns = [
+            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
+            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
+            (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
+            (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4})\b', '%d %B %Y'),
+            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (\d{4})\b','%B %d %Y'), # Added this line
+            (r'\b(\d{1,2}) (AM|PM)\b', None),
+            (r'\b(Morning|Afternoon|Evening|Night)\b', None),
+            (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m/%d/%Y'),
+            (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m-%d-%Y'),
+            (r'\b(\d{4})-(\d{2})-(\d{1,2})\b', '%Y-%m-%d'),
+            (r'\b(\d{2})/(\d{1,2})/(\d{4})\b', '%m/%d/%Y'),
+            (r'\b(\d{4})/(\d{2})/(\d{1,2})\b', '%Y/%m/%d'),
+            (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d, %Y'),
+            (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d %Y'),
+            (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4})\b', '%b %d, %Y'),
+            (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4})\b', '%b %d %Y'),
+            (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %b %Y'),
+            (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4})\b', '%d %b %Y'),
+    ]
+    
+    
+        # Time mappings for periods of the day
+        time_mappings = {
+            "Morning": 9,
+            "Afternoon": 15,
+            "Evening": 18,
+            "Night": 21
+        }
+    
+        datetime_obj = None
+    
+        for pattern, date_format in patterns:
+            # print(response,'response++')
+            match = re.search(pattern, response)
+            
+            if match:
+                groups = match.groups()
+                if date_format:
+                    
+                    date_str = ' '.join(groups[:3])
+                    
+                    datetime_obj = datetime.strptime(date_str, date_format)
+                    if len(groups) == 4:  # If there's a time of day
+                        period = groups[3]
+                        hour = time_mappings.get(period, 12)
                         datetime_obj = datetime_obj.replace(hour=hour)
-                    else:
-                        # datetime_obj = datetime.combine(datetime.now.date(), datetime.time(hour=hour))
-                        datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
- 
-                elif len(groups) == 1 and groups[0] in time_mappings:
-                    period = groups[0]
-                    hour = time_mappings[period]
-                    if datetime_obj:
-                        datetime_obj = datetime_obj.replace(hour=hour)
-                    else:
-                        datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
- 
-                        # datetime_obj = datetime.combine(datetime.now().date(), datetime.time(hour=hour))
-            break
-   
-    if not datetime_obj:
-        raise ValueError("No valid date format found in the response")
- 
-    return datetime_obj.isoformat()
+                    break
+                else:
+                    if len(groups) == 2 and groups[1] in ["AM", "PM"]:
+                        hour, am_pm = groups
+                        hour = int(hour)
+                        if am_pm == 'PM' and hour != 12:
+                            hour += 12
+                        elif am_pm == 'AM' and hour == 12:
+                            hour = 0
+                        if datetime_obj:
+                            datetime_obj = datetime_obj.replace(hour=hour)
+                        else:
+                            # datetime_obj = datetime.combine(datetime.now.date(), datetime.time(hour=hour))
+                            datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
+    
+                    elif len(groups) == 1 and groups[0] in time_mappings:
+                        period = groups[0]
+                        hour = time_mappings[period]
+                        if datetime_obj:
+                            datetime_obj = datetime_obj.replace(hour=hour)
+                        else:
+                            datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
+    
+                            # datetime_obj = datetime.combine(datetime.now().date(), datetime.time(hour=hour))
+                break
+    
+        if not datetime_obj:
+            raise ValueError("No valid date format found in the response")
+    
+        return datetime_obj.isoformat()
+
 # Tool to book appointment
 def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
     try:
@@ -768,9 +906,12 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
 
     print("Available locations:")
     result=''
+    valid_ids=[]
     for idx, location in enumerate(locations):
         result+=f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})\n"
-        #print(f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})")
+        
+        valid_ids.append(location['LocationId'])
+        
     if request.session['book_appointment']=='True':  
        result=f" Choose a location by entering the ID: {result}"
        return result
@@ -803,9 +944,9 @@ def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumb
     print("Available providers:")
     result=''
     for idx, provider in enumerate(providers):
-        print('----------',f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})")
+        
         result+=f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})\n"
-    #print(request.session['provider_id'],'request.session["provider_id"]----------------')
+   
 
     if request.session['provider_id']=='True':  
        
@@ -994,12 +1135,23 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
  
     print("Available locations:")
     result = ''
+    valid_ids=''
     for idx, location in enumerate(locations):
         result += f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})\n"
+        valid_ids+= ' '+ (str(location['LocationId']).strip())
+        
     if request.session['book_appointment'] == 'True':
+
         result = f"Choose a location by entering the ID: {result}"
         return result
-    location_id = request.session['book_appointment']
+    if str(request.session['book_appointment']) in valid_ids:
+        location_id = request.session['book_appointment']
+    else:
+        request.session['book_appointment'] = 'True'
+
+        return f"""Invalid location ID. 
+                choose a valid location by entering the ID. {result} """
+        
     
     if location_id:
         print("Thanks for providing location")
@@ -1025,12 +1177,19 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
    
     print("Available providers:")
     result = ''
+    valid_ids=''
     for idx, provider in enumerate(providers):
         result += f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})\n"
+        valid_ids+= ' '+ (str(provider['ScheduleResourceId']).strip())
     if request.session['provider_id'] == 'True':
         result = f"Choose a provider by entering the ID: {result}"
         return result
-    provider_id = request.session['provider_id']
+    if str(request.session['provider_id']) in valid_ids:
+        provider_id = request.session['provider_id']
+    else:
+        request.session['provider_id'] = 'True'
+        return f"""Invalid provider ID. 
+                choose a valid provider by entering the ID. {result} """
  
     # Step 3: Get the appointment reasons for the selected provider and location
     get_reasons_url = f"https://iochatbot.maximeyes.com/api/appointment/appointmentreasonsForChatBot?LocationId={location_id}&SCHEDULE_RESOURCE_ID={provider_id}"
@@ -1052,13 +1211,19 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         request.session['reason_id'] = 'True'
     print("Available reasons:")
     result = ''
+    valid_ids=''
     for idx, reason in enumerate(reasons):
         result += f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})\n"
+        valid_ids+= ' '+ (str(reason['ReasonId']).strip())
     if request.session['reason_id'] == 'True':
         result = f"Choose a reason by entering the ID: {result}"
         return result
- 
-    reason_id = request.session['reason_id']
+    if str(request.session['reason_id']) in valid_ids:
+        reason_id = request.session['reason_id']
+    else:
+        request.session['reason_id'] = 'True'
+        return f"""Invalid reason ID. 
+                choose a valid reason by entering the ID. {result} """
  
     # Step 4: Get the open slots for the selected location, provider, and reason
     print(prefred_date_time,'prefred_date_time -----------------')
@@ -1086,12 +1251,19 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         request.session['slot_id'] = 'True'
     print("Available open slots:")
     result = ''
+    valid_ids=[]
     for idx, slot in enumerate(open_slots):
         result += f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})\n"
+        valid_ids.append(str(slot['OpenSlotId']).strip())
     if request.session['slot_id'] == 'True':
         result = f"Choose an open slot by entering the ID: {result}"
         return result
-    open_slot_id = request.session['slot_id']
+    if str(request.session['slot_id']).strip() in valid_ids:
+        open_slot_id = request.session['slot_id']
+    else:
+        request.session['slot_id'] = 'True'
+        return f"""Invalid slot ID. 
+                choose a valid slot by entering the ID. {result} """
  
     # Step 5: Confirm details with the user
    
@@ -1243,12 +1415,17 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
             "MobileNumber": PhoneNumber,
             "EmailId": Email}  
           
-        result = f"""Your Appointment is scheduled, Thanks for choosing us , Is there anything i can help you with? 
-        appointment Details:
-        {book_appointment_payload}
-        
-        
-        """
+        result = f"""Your Appointment is scheduled, Thanks for choosing us , Here are the appointment details:
+            
+            Appt. Date: {appointment_date},
+            Time Slot :{ open_slot},                  
+            Name: {FirstName} {LastName} ,    
+            MobileNumber: {PhoneNumber},
+            EmailId: {Email}
+            
+            
+            """
+        print(result)
         result= transform_input(result)
         result=result+'\n'+'Thanks, Have a great day! '
         return result
@@ -1266,7 +1443,7 @@ def generate_response(prompt, max_length=512, num_return_sequences=1):
 # Function to interactively handle the user query
 def verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
   a=f"FirstName: {FirstName}\nLastName: {LastName}\nDOB: {DOB}\nPhoneNumber: {PhoneNumber}\nEmail: {Email}\nprefred_date_time: {prefred_date_time}"
-  print(a)
+
 
 def update_field(extracted_info, field, value):
     if value and value.lower() != "none":
@@ -1282,63 +1459,32 @@ def validate_phone(phone):
     return re.match(pattern, phone) is not None
 def handle_user_query1(request,user_query):
     # Identify the user's intent
-    print("user_query:", user_query)
-    data = json.loads(request.body.decode('utf-8'))
-    intent = identify_intent_practice_question(user_query,data.get('practice1_details', ''))
     
-    print(intent)
-    if 'booking an appointment' in intent  or 'booking ' in intent or 'Booking' in intent or  'not available' in intent or 'appointment' in user_query :
-        pass
-    else:
-        request.session['context']=''
-        return intent
-    # if intent != 'other':
-    #     print(intent,'intent')
-    #     data = json.loads(request.body.decode('utf-8'))
-    #     if 'address' in intent or 'Address' in intent:
-    #         prompt = f"""i want to give them my Address {data.get('practice_address', '')}""" 
-    #         print(prompt)
-    #         user_response = transform_input(prompt)
-    #         return user_response
-    #     elif 'name' in intent or 'Name' in intent:
-    #         data = json.loads(request.body.decode('utf-8'))
-
-    #         prompt = f""" this is our Name :{data.get('practice_name', '')}""" 
-    #         user_response = transform_input(prompt)
-    #         return user_response
-    #     elif 'hour' in intent or 'Hour' in intent:
-    #         data = json.loads(request.body.decode('utf-8'))
+    # data = json.loads(request.body.decode('utf-8'))
+    # intent = identify_intent_practice_question(user_query,data.get('practice1_details', ''))
     
-    #         prompt = f""" this is our email working hours :{data.get('practice_hour', '')}""" 
-    #         user_response = transform_input(prompt)
-    #         return user_response
-    #     elif 'email' in intent or 'Email' in intent:
-    #         data = json.loads(request.body.decode('utf-8'))
     
-    #         prompt = f"""this is our email :{data.get('practice_email', '')}""" 
-    #         user_response = transform_input(prompt)
-    #         return user_response
-    #     else:
-    #        pass
-
-        
-    #     # print(user_response,'-------------------')
-    #     # return user_response
+    # if 'booking an appointment' in intent  or 'booking ' in intent or 'Booking' in intent or  'not available' in intent or 'appointment' in user_query :
+    #     pass
+    # else:
+    #     request.session['context']=''
+    #     return intent
+   
 
     intent = identify_intent(user_query)
     
-    
-    
-    # print(f"Identified intent: {intent}")
-
 
 
     if "greeting" in intent.lower():
         prompt = "Hello! How can I assist you today? Do you need help with booking an appointment or something else?"
         user_response = transform_input(prompt)
         return user_response
- 
-
+    data = json.loads(request.body.decode('utf-8'))
+    data =data.get('practice1_details', '')
+    static_response = handle_static_queries(user_query, data)
+    if static_response != "Sorry, I don't understand your request. Can you please provide more details?":
+        return static_response
+   
     # If the intent is to book an appointment
     if "booking an appointment" in intent.lower() or "schedule appointment" in intent.lower() or "book" in intent.lower():
       extracted_info = fetch_info_openai(user_query)
@@ -1446,11 +1592,11 @@ def handle_user_query1(request,user_query):
                 return edit_response
 
         # Book the appointment
-        try:
-            book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
-        except:
-            data = json.loads(request.body.decode('utf-8'))
-            book_appt=f"Please  contact : {data.get('practice_email', '')} "
+        # try:
+        book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
+        # except:
+        #     data = json.loads(request.body.decode('utf-8'))
+        #     book_appt=f"Please  contact : {data.get('practice_email', '')} "
         
         try:
             if 'Appointment scheduled successfully' in book_appt:
@@ -1590,12 +1736,11 @@ def home2(request):
 def func(request):
     resp=''
     
-   
     if request.method=='POST':
         data = json.loads(request.body.decode('utf-8'))
         message = data.get('input', '')
         querry=message
-        print("querry",querry)
+        
         if  request.session.get('book_appointment')=='True':
             try:
                 request.session['book_appointment']=message
@@ -1659,6 +1804,7 @@ def handle_user_query(request):
     if request.method != 'POST':
         return JsonResponse({"error": "Invalid request method"}, status=405)
     try:
+        
         request.session['context']= request.session['context'] +' '+message
     except:
         request.session['context']=message
@@ -1678,14 +1824,14 @@ def handle_user_query(request):
         if not input_message:
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 
-        try:
+        if True:
             response = handle_user_query1(request,input_message)
-        except:
+        else:
             print('error in handle_user_query1')
             data = json.loads(request.body.decode('utf-8'))
             response = f"please contact our support team :{data.get('practice_email', '')}"
             return response
-        print(response,'response----------------')
+        # print(response,'response----------------')
         if response=='none' or response==None:
             data = json.loads(request.body.decode('utf-8'))
 
