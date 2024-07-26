@@ -171,7 +171,7 @@ def identify_intent(user_query):
         For each intent:
         - If it’s a greeting, respond warmly like: "Hi there! How can I assist you today?"
         - For booking, rescheduling, or canceling appointments, provide clear and helpful instructions.
-        - For static information requests  return result "static"
+        - For static information requests also ask about insurance return result "static"
         - For other inquiries, provide a friendly and helpful response.
         and make sure that if query is regarding appointments it doesnot goes to static part
         Avoid overly formal or robotic responses, and tailor the language to be more like a friendly human conversation.
@@ -553,7 +553,7 @@ def prefred_date_time_fun1(response):
       date_str = f"{month} {day}, {year}"
 
       # Convert month_day_year to a datetime object
-      datetime_obj = datetime.datetime.strptime(date_str, '%B %d, %Y')
+      datetime_obj = datetime.strptime(date_str, '%B %d, %Y')
 
       # Define time mappings
       time_mappings = {"Morning": 10,
@@ -623,13 +623,13 @@ def prefred_date_time_fun(response):
     def get_next_weekday(day_name, use_next=False):
     # Dictionary to convert day names to weekday numbers
         days_of_week = {
-            'monday': 0, 'mon': 0,
-            'tuesday': 1, 'tues': 1,
-            'wednesday': 2, 'wed': 2,
-            'thursday': 3, 'thurs': 3,
-            'friday': 4, 'fri': 4,
-            'saturday': 5, 'sat': 5,
-            'sunday': 6, 'sun': 6
+            'monday': 0, 'mon': 0, 'Monday': 0, 'Mon': 0,
+            'tuesday': 1, 'tues': 1,'Tuesday': 1, 'Tues': 1,
+            'wednesday': 2, 'wed': 2,'Wednesday': 2, 'Wed': 2,
+            'thursday': 3, 'thurs': 3,'Thursday': 3, 'Thurs': 3,
+            'friday': 4, 'fri': 4,'Friday':4, 'Fri':4,
+            'saturday': 5, 'sat': 5,'Saturday': 5, 'Sat': 5,
+            'sunday': 6, 'sun': 6,'Sunday': 6, 'Sun': 6
         }
 
         # Get today's date and the current weekday
@@ -652,13 +652,13 @@ def prefred_date_time_fun(response):
     def get_upcoming_weekday(day_name):
         # Dictionary to convert day names to weekday numbers
         days_of_week = {
-            'monday': 0, 'mon': 0,
-            'tuesday': 1, 'tues': 1,
-            'wednesday': 2, 'wed': 2,
-            'thursday': 3, 'thurs': 3,
-            'friday': 4, 'fri': 4,
-            'saturday': 5, 'sat': 5,
-            'sunday': 6, 'sun': 6
+            'monday': 0, 'mon': 0, 'Monday': 0, 'Mon': 0,
+            'tuesday': 1, 'tues': 1,'Tuesday': 1, 'Tues': 1,
+            'wednesday': 2, 'wed': 2,'Wednesday': 2, 'Wed': 2,
+            'thursday': 3, 'thurs': 3,'Thursday': 3, 'Thurs': 3,
+            'friday': 4, 'fri': 4,'Friday':4, 'Fri':4,
+            'saturday': 5, 'sat': 5,'Saturday': 5, 'Sat': 5,
+            'sunday': 6, 'sun': 6,'Sunday': 6, 'Sun': 6
         }
         # Get today's date and the current weekday
         today = datetime.now()
@@ -700,7 +700,7 @@ def prefred_date_time_fun(response):
                 break
 
         # Extract the day name from the response
-        day_name_match = re.search(r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues|wed|thurs|fri|sat|sun)\b', response, re.IGNORECASE)
+        day_name_match = re.search(r'\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tues|Wed|Thurs|Fri|Sat|Sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues|wed|thurs|fri|sat|sun)\b', response, re.IGNORECASE)
         if day_name_match:
             day_name = day_name_match.group(0)
         else:
@@ -712,6 +712,8 @@ def prefred_date_time_fun(response):
                 next_day = get_next_weekday(day_name)
                 if next_day <= relative_day:
                     next_day += timedelta(days=7)
+                if next_day < datetime.now():
+                    return "Date is in the past"
                 return next_day.strftime("%Y-%m-%dT%H:%M:%S")
             else:
                 return relative_day.strftime("%Y-%m-%dT%H:%M:%S")
@@ -725,10 +727,13 @@ def prefred_date_time_fun(response):
                     next_day = get_upcoming_weekday(day_name)
                 else:
                     next_day = get_next_weekday(day_name, use_next)
+                if next_day < datetime.now():
+                    return "Date is in the past"
                 return next_day.strftime("%Y-%m-%dT%H:%M:%S")
             else:
                 return "No valid day found in the response"
     if "next" in response.lower() or "coming" in response.lower() or "upcoming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
+        
         return extract_date_from_response(response)
 
     else:
@@ -785,6 +790,8 @@ def prefred_date_time_fun(response):
                         period = groups[3]
                         hour = time_mappings.get(period, 12)
                         datetime_obj = datetime_obj.replace(hour=hour)
+                        if datetime_obj < datetime.now():
+                            return "Date is in the past"
                     break
                 else:
                     if len(groups) == 2 and groups[1] in ["AM", "PM"]:
@@ -1168,6 +1175,15 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     # Step 4: Get the open slots for the selected location, provider, and reason
     print(prefred_date_time,'prefred_date_time -----------------')
     preferred = prefred_date_time_fun(prefred_date_time)
+    print(type(preferred),'=========',preferred)
+    if 'Date is in the past' in preferred:
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        message=request.session[f'context{session_id}']
+        message=message.replace(prefred_date_time,'')
+        request.session[f'context{session_id}']=message
+        return 'Please provide a valid date time for Appointment'
+    
     print("Preferred date time", preferred)
  
     from_date = preferred
@@ -1369,6 +1385,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         print(result)
         result= transform_input(result)
         result=result+'\n'+'Thanks, Have a great day! '
+        delete_session(request)
         return result
     
     
