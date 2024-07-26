@@ -266,7 +266,6 @@ def edit_msg(request):
         user_response = transform_input(prompt)
         return user_response
     else:
-        print("dwhihdw",request.session['edit_msg'])
         edit_msg=request.session['edit_msg']
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
@@ -1562,7 +1561,9 @@ def handle_user_query1(request,user_query):
   #If the intent is not related to booking, generate a response using the fine-tuned model
     else:
         # response = generate_response(user_query)
-        return "njgyjy"
+        data = json.loads(request.body.decode('utf-8'))
+        data =data.get('practice_name', '')
+        return f"Sorry, I can only help with {data} related questions. If you have any inquiries about our services, appointment scheduling, or eye care in general, feel free to ask!"
 
 # Main function to handle user query
 # def handle_user_query_me(request, user_query):
