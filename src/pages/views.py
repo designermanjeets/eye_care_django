@@ -5,7 +5,6 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-
 import openai
 from pydantic import BaseModel, Field
 from langchain.chains import LLMChain
@@ -19,13 +18,16 @@ import json
 import requests
 from datetime import datetime, timedelta,date
 import re
+import torch
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from peft import PeftModel
 
 from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize the OpenAI client
 # open_api_key = os.getenv("OPENAI_API_KEY")
-open_api_key = ' '
+open_api_key = ''
 
 client = OpenAI(api_key=open_api_key)
 
@@ -35,38 +37,51 @@ vendor_password = os.getenv("VendorPassword")
 account_id = os.getenv("AccountId")
 account_password = os.getenv("AccountPassword")
 
+# Load the base model and tokenizer
+base_model_name = "NousResearch/Llama-2-7b-chat-hf"
+tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+base_model = AutoModelForCausalLM.from_pretrained(base_model_name, device_map='auto', torch_dtype=torch.float16)
+
+# Load the fine-tuned adapter weights
+parent = os.path.dirname(os.path.abspath(__file__))
+print(parent)
+adapter_path = f'{parent}/checkpoint-1070'
+print(adapter_path)
+model = PeftModel.from_pretrained(base_model, adapter_path)
+
 # Print the model structure for debugging
 def print_model_structure(model):
     for name, module in model.named_modules():
         print(name)
 print("Base model structure : ")
 
-# Define the function to call the Hugging Face endpoint
+# # Define the function to call the Hugging Face endpoint
+# def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_factor=0.3):
+#     headers = {
+#         "Authorization": f"Bearer {api_token}",
+#         "Content-Type": "application/json"
+#     }
+#     print(headers,"???????????huggingface")
+#     data = {
+#         "inputs": prompt,
+#         "parameters": {
+#             "max_length": 512,
+#             "num_return_sequences": 1,
+#         }
+#     }
 
-def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_factor=0.3):
-    headers = {
-        "Authorization": f"Bearer {api_token}",
-        "Content-Type": "application/json"
-    }
-    data = {
-        "inputs": prompt,
-        "parameters": {
-            "max_length": 512,
-            "num_return_sequences": 1,
-        }
-    }
-    for attempt in range(retries):
-        try:
-            response = requests.post(api_url, headers=headers, json=data)
-            response.raise_for_status()
-            return response.json()[0]["generated_text"]
-        except requests.exceptions.RequestException as e:
-            if attempt < retries - 1:
-                sleep_time = backoff_factor * (2 ** attempt)
-                print(f"Retrying in {sleep_time} seconds...")
-                time.sleep(sleep_time)
-            else:
-                raise e
+#     for attempt in range(retries):
+#         try:
+#             response = requests.post(api_url, headers=headers, json=data)
+#             response.raise_for_status()
+#             return response.json()[0]["generated_text"]
+#         except requests.exceptions.RequestException as e:
+#             if attempt < retries - 1:
+#                 sleep_time = backoff_factor * (2 ** attempt)
+#                 print(f"Retrying in {sleep_time} seconds...")
+#                 time.sleep(sleep_time)
+#             else:
+#                 raise e
 
 
 def convert_date_format(date_str):
@@ -169,13 +184,13 @@ def identify_intent(user_query):
         - Other inquiries
  
         For each intent:
-        - If it’s a greeting, respond warmly like: "Hi there! How can I assist you today?"
+        - If it's a greeting, respond warmly like: "Hi there! How can I assist you today?"
         - For booking, rescheduling, or canceling appointments, provide clear and helpful instructions.
         - For static information requests also ask about insurance return result "static"
         - For other inquiries, provide a friendly and helpful response.
-        and make sure that if query is regarding appointments it doesnot goes to static part
+        and make sure that if query is regarding appointments it does not goes to static part
         Avoid overly formal or robotic responses, and tailor the language to be more like a friendly human conversation.
-        and please note that donot return same text if you donot understand ask your queries
+        and please note that do not return same text if you do not understand ask your queries
     """)
     retries = 3
     backoff_factor = 0.3
@@ -220,7 +235,7 @@ def identify_intent_practice_question(user_query,data):
     Determine the intent of the query. If the query requests information that is available in the provided {data}, respond with the appropriate information from the data.
     If the query does not match any available information, respond with "Please provide valid information."
     If the query does not fit any of these categories, respond with "I'm sorry, I can't provide that information. Can you ask about something else related to our services or appointments?"
-    and please note that donot return same text if you donot understand ask your queries
+    and please note that donot return same text if you donot understand ask your queries.
     Avoid formal language; aim for a friendly and human-like tone."""
     )
     chat_completion = client.chat.completions.create(
@@ -1431,17 +1446,34 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         del request.session[f'context{session_id}']
-        return result
-    
-    
+        return result    
     return "Thanks, Have a great day! "
 
 
+# Instruction to guide the language model
+instruction = """You are a creative assistant for eye care services. You must ONLY provide information directly related to eye health, vision, and eye care services. If the user's query is not related to eye care, respond with EXACTLY this message: 'I apologize, but I can only answer questions related to eye care. If you have any eye-related questions, I'd be happy to help. For more information, please contact 'RoseCity@gmail.com' """
+
+def generate_response(user_query, max_length=512, num_return_sequences=1):
+    prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    outputs = model.generate(
+        **inputs,
+        max_length=max_length,
+        num_return_sequences=num_return_sequences,
+        pad_token_id=tokenizer.eos_token_id
+    )
+    response = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+    
+    # Extract only the response part
+    response = response.split("Response:")[-1].strip()
+    
+    return response
+
 # Function to generate response using Hugging Face endpoint
-def generate_response(prompt, max_length=512, num_return_sequences=1):
-    api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"  
-    api_token = os.getenv("HUGGINGFACE_API_TOKEN")
-    return call_huggingface_endpoint(prompt, api_url, api_token)
+# def generate_response(prompt, max_length=512, num_return_sequences=1):
+#     api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"  
+#     api_token = os.getenv("HUGGINGFACE_API_TOKEN")
+#     return call_huggingface_endpoint(prompt, api_url, api_token)
 
 # Function to interactively handle the user query
 def verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
@@ -1904,13 +1936,14 @@ def handle_user_query(request):
         if not input_message:
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 
-        try:
-            response = handle_user_query1(request,input_message)
-        except:
-            print('error in handle_user_query1')
-            data = json.loads(request.body.decode('utf-8'))
-            response = f"please contact our support team :{data.get('practice_email', '')}"
-            return response
+        # try:
+        response = handle_user_query1(request,input_message)
+        
+        # except:
+        #     print('error in handle_user_query1')
+        #     data = json.loads(request.body.decode('utf-8'))
+        #     response = f"please contact our support team :{data.get('practice_email', '')}"
+        #     return response
         # print(response,'response----------------')
         if response=='none' or response==None:
             data = json.loads(request.body.decode('utf-8'))
