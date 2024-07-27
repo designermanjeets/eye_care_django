@@ -181,16 +181,11 @@ def identify_intent(user_query):
         - Rescheduling an appointment
         - Canceling an appointment
         - Requesting static information (e.g., office hours, address)
-        - Other inquiries
  
         For each intent:
         - If it's a greeting, respond warmly like: "Hi there! How can I assist you today?"
         - For booking, rescheduling, or canceling appointments, provide clear and helpful instructions.
         - For static information requests also ask about insurance return result "static"
-        - For other inquiries, provide a friendly and helpful response.
-        and make sure that if query is regarding appointments it does not goes to static part
-        Avoid overly formal or robotic responses, and tailor the language to be more like a friendly human conversation.
-        and please note that do not return same text if you do not understand ask your queries
     """)
     retries = 3
     backoff_factor = 0.3
