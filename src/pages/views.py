@@ -5,7 +5,6 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-
 import openai
 from pydantic import BaseModel, Field
 from langchain.chains import LLMChain
@@ -19,14 +18,16 @@ import json
 import requests
 from datetime import datetime, timedelta,date
 import re
+# import torch
+# from transformers import AutoTokenizer, AutoModelForCausalLM
+# from peft import PeftModel
 
 from dotenv import load_dotenv
 load_dotenv()
 
 # Initialize the OpenAI client
 # open_api_key = os.getenv("OPENAI_API_KEY")
-open_api_key = ' '
-
+open_api_key = ''
 client = OpenAI(api_key=open_api_key)
 
 # Initialize the API credentials
@@ -42,7 +43,6 @@ def print_model_structure(model):
 print("Base model structure : ")
 
 # Define the function to call the Hugging Face endpoint
-
 def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_factor=0.3):
     headers = {
         "Authorization": f"Bearer {api_token}",
@@ -68,7 +68,7 @@ def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_fac
             else:
                 raise e
 
-
+# function for required date format in API
 def convert_date_format(date_str):
     # Define date formats
     formats = [
@@ -79,7 +79,6 @@ def convert_date_format(date_str):
         "%b %d, %Y",       # Abbreviated month name with day and year
         "%d %B %Y"         # Day with full month name and year
     ]
-
     # Remove ordinal suffixes (e.g., "st", "nd", "rd", "th")
     date_str = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_str)
 
@@ -96,7 +95,7 @@ def convert_date_format(date_str):
     # If no formats match, return the original string
     return date_str
 
-
+## function to fetch user info
 def fetch_info_openai(response):
     prompt =(
         f"Extract the following information from the text if available else give empty value:\n"
@@ -138,27 +137,6 @@ def fetch_info_openai(response):
 
 # Function to identify intent
 def identify_intent(user_query):
-    # prompt = (
-    #     f"""Identify the intent of the following query: "{user_query}".
- 
-    #     If the query is related to a greeting, respond with "Hello, how can I help you? reagardung appointments".
-    #     Is it related to book an appointment, rescheduling an appointment, canceling an appointment, or something else? And also check the appointment date and time
-    #     Also, check if the query includes an appointment date and time, if applicable."""
-    # # )
-    # prompt = (
-    #     f"""Given the following user query: "{user_query}", perform the following tasks:
-    #     1. Identify the primary intent of the query. Determine if it is:
-    #        - A greeting
-    #        - A request to book an appointment
-    #        - A request to reschedule an appointment
-    #        - A request to cancel an appointment
-    #        - A request for static information (e.g., office timings, address)
-    #        - Another type of inquiry
-    #     2. If the query is a greeting, respond with "Hello, how can I help you regarding appointments or any other questions related to this?".
-    #     3. If the query is not related to eye check-up or eye health issues, respond with "Please ask a valid question related to eye care or appointments.".
-    #     4. If the query is a request for static information, respond with the appropriate details (e.g., office timings, address) return "static" only .
-    #     5. Check if the query includes any specific appointment date and time details. If applicable, extract and validate this information."""
-    # )
     prompt=(
         f"""Given the following user query: "{user_query}", identify the primary intent. The intent could be:
         - Greeting
@@ -169,13 +147,13 @@ def identify_intent(user_query):
         - Other inquiries
  
         For each intent:
-        - If it’s a greeting, respond warmly like: "Hi there! How can I assist you today?"
+        - If it's a greeting, respond warmly like: "Hi there! How can I assist you today?"
         - For booking, rescheduling, or canceling appointments, provide clear and helpful instructions.
         - For static information requests also ask about insurance return result "static"
         - For other inquiries, provide a friendly and helpful response.
-        and make sure that if query is regarding appointments it doesnot goes to static part
+        and make sure that if query is regarding appointments it does not goes to static part
         Avoid overly formal or robotic responses, and tailor the language to be more like a friendly human conversation.
-        and please note that donot return same text if you donot understand ask your queries
+        and please note that do not return same text if you do not understand ask your queries
     """)
     retries = 3
     backoff_factor = 0.3
@@ -193,7 +171,7 @@ def identify_intent(user_query):
             )
             # Extract the intent from the response
             intent = chat_completion.choices[0].message.content.strip()
-            print("regnskj",intent)
+            print("intent",intent)
             return intent
         except requests.exceptions.RequestException as e:
             if attempt < retries - 1:
@@ -208,19 +186,14 @@ def identify_intent(user_query):
             return "Error: An unexpected error occurred while identifying intent."
 
 
-
+# funtion to find intent for practice/custom questions
 def identify_intent_practice_question(user_query,data):
-    # prompt = (
-    #     f"""Identify the intent of this query :  "{user_query}".
-    #     and if it is asking for an address, email , or work timimg  or name reply me in a single word only as address for address, name for name, email for email, hours for work timing or working hours or simillar
-    #     and if intentent is not frome abouve given then return the intent as other"""                    
-    # )
     prompt = (
     f"""Analyze the following user query: "{user_query}".
     Determine the intent of the query. If the query requests information that is available in the provided {data}, respond with the appropriate information from the data.
     If the query does not match any available information, respond with "Please provide valid information."
     If the query does not fit any of these categories, respond with "I'm sorry, I can't provide that information. Can you ask about something else related to our services or appointments?"
-    and please note that donot return same text if you donot understand ask your queries
+    and please note that donot return same text if you donot understand ask your queries.
     Avoid formal language; aim for a friendly and human-like tone."""
     )
     chat_completion = client.chat.completions.create(
@@ -236,7 +209,7 @@ def identify_intent_practice_question(user_query,data):
     intent = chat_completion.choices[0].message.content.strip()
     return intent
 
-
+# funtion for edit user info
 def edit_msg(request):
     data = json.loads(request.body.decode('utf-8'))
     session_id = data.get('session_id', '')
@@ -250,9 +223,7 @@ def edit_msg(request):
  
     if request.session[f'edit_msg{session_id}']=='True':
         # Extract the current context from the session
-        current_context = request.session.get('context', '{}')
-        # print("sdfnkjg",current_context)
-   
+        current_context = request.session.get('context', '{}')   
         # Convert context from JSON string to dictionary if necessary
         if isinstance(current_context, str):
             try:
@@ -272,7 +243,7 @@ def edit_msg(request):
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         context=request.session[f'context{session_id}']
-        print("esgnijsg",user_response)
+        print("user_response",user_response)
         prompt = (
         f"""this is my old context{context} and i want to update this context {edit_msg} using this infomation"""
            
@@ -287,14 +258,14 @@ def edit_msg(request):
         ]
         )
         context = chat_completion.choices[0].message.content.strip()
-        # print('ecwaf----',context)
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         request.session[f'context{session_id}']=context
         del request.session[f'edit_msg{session_id}']
         del request.session[f'confirmation{session_id}']
-        return handle_user_query1(request,context)
-   
+        return handle_user_query_postprocess(request,context)
+
+# function to handle greeting    
 def greeting_handle(user_query):
     prompt = (
         f"""Identify the user query: "{user_query}".
@@ -313,6 +284,7 @@ def greeting_handle(user_query):
     intent = chat_completion.choices[0].message.content.strip()
     return intent
 
+# function for preferred time appointment
 def date_time_format(date_time):
     date_pattern = r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b'
  
@@ -332,6 +304,7 @@ def date_time_format(date_time):
     transformed_text = response.choices[0].message['content']
     return transformed_text
 
+# funtion for data validation check
 def validation_check(user_query):
     prompt = (
         f"""Identify the user input: "{user_query}".
@@ -350,44 +323,16 @@ def validation_check(user_query):
     intent = chat_completion.choices[0].message.content.strip()
     return intent
 
-
-# # Function to extract required information
-# def fetch_info(response):
-#     model = ChatOpenAI(temperature=0, openai_api_key=open_api_key)
-
-#     class Req_info(BaseModel):
-#         Lastname: str = Field(
-#             description="The value that identifies lastname of the user")
-#         DateOfBirth: str = Field(
-#             description="The value that represents date of birth")
-
-#     parser = PydanticOutputParser(pydantic_object=Req_info)
-#     prompt = PromptTemplate(
-#         template="Extract the information that defined.\n{format_instructions}\n{query}\n",
-#         input_variables=["query"],
-#         partial_variables={"format_instructions": parser.get_format_instructions()},
-#     )
-
-#     chain = prompt | model | parser
-#     final_results = chain.invoke({"query": response})
-#     final_results1 = dict(final_results)
-#     print(type(final_results1))
-#     return final_results1
-
+# function for transforming the responses
 def transform_input(input_text):
     # Define a list of prompts to transform the input text
     prompts = [
 
         f"Rephrase the following request in a more engaging way related to appointment do not use brackets : '{input_text}'",
-
         f"How would you ask this question in a friendly and conversational tone related to appointment do not use brackets :  '{input_text}'?",
-
         f"How would you ask this question in a friendly and conversational tone related to appintment and shoud be ques not like ask ques on bracket: '{input_text}'?",
-
         f"Make this request sound more personable and interesting related to appointment do not use brackets : '{input_text}'",
-
         f"Convert this question into a warm and inviting request related to appointment do not use brackets : '{input_text}'",
-
         f"Turn the following statement into a casual and friendly question related to appointment do not use brackets : '{input_text}'"
 
     ]
@@ -412,50 +357,20 @@ def transform_input(input_text):
         temperature=0.9
 
     )
-
     # Extract the response text
     transformed_text = response.choices[0].message.content.strip()
     return transformed_text
 
+# funtion to update user info
 def update_info(extracted_info, additional_info):
     for key, value in additional_info.items():
         if value and value.lower() != "none":
             extracted_info[key] = value
 
-# Function to get authentication token
-# def get_auth_token(vendor_id, vendor_password, account_id, account_password):
-#     auth_url = "https://iochatbot.maximeyes.com/api/v2/account/authenticate"
-#     auth_payload = {
-#         "VendorId": vendor_id,
-#         "VendorPassword": vendor_password,
-#         "AccountId": account_id,
-#         "AccountPassword": account_password
-#     }
-#     headers = {'Content-Type': 'application/json'}
-#     try:
-#         auth_response = requests.post(auth_url, json=auth_payload, headers=headers)
-#         auth_response.raise_for_status()
-#         response_json = auth_response.json()
-
-#         if response_json.get('IsToken'):
-#             return response_json.get('Token')
-#         else:
-#             print("Error message:", response_json.get('ErrorMessage'))
-#             return None
-#     except requests.RequestException as e:
-#         print(f"Authentication failed: {str(e)}")
-#         return None
-#     except json.JSONDecodeError:
-#         print("Failed to decode JSON response")
-#         return None
-
-
 # Tool to get authentication token
 def get_auth_token(vendor_id, vendor_password, account_id, account_password) -> str:
     """
-
-    Get authentication token using vendor and account credentials.
-    
+    Get authentication token using vendor and account credentials.    
     """
     auth_url = "https://iochatbot.maximeyes.com/api/v2/account/authenticate"
     auth_payload = { "VendorId": "e59ec838-2fc5-4639-b761-78e3ec55176c", "VendorPassword": "password@123", "AccountId": "chatbot1", "AccountPassword": "sJ0Y0oniZb6eoBMETuxUNy0aHf6tD6z3wynipZEAxcg=" }
@@ -464,6 +379,7 @@ def get_auth_token(vendor_id, vendor_password, account_id, account_password) -> 
         auth_response = requests.post(auth_url, json=auth_payload, headers=headers)
         auth_response.raise_for_status()
         response_json = auth_response.json()
+        print(response_json,"??????????????????????")
  
         if response_json.get('IsToken'):
             return response_json.get('Token')
@@ -474,8 +390,8 @@ def get_auth_token(vendor_id, vendor_password, account_id, account_password) -> 
     except json.JSONDecodeError:
         return "Failed to decode JSON response"
 
+# extracting day as per prefered time for appointment
 def prefred_date_time_fun1(response):
-  #print("response12",response)
   if "next" in response.lower() or "comming" in response.lower() or "upcomming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
         def get_next_weekday(day_name, use_next=False):
             # Dictionary to convert day names to weekday numbers
@@ -503,7 +419,6 @@ def prefred_date_time_fun1(response):
 
             # Calculate the date for the next target weekday
             next_weekday = today + timedelta(days=days_until_target)
-
             return next_weekday
 
         def get_relative_day(keyword):
@@ -550,7 +465,6 @@ def prefred_date_time_fun1(response):
     
     try:
       match = re.search(date_pattern, response)
-      # print("value in the date_time",match.groups())
       month, day, year, time_of_day = match.groups()
       date_str = f"{month} {day}, {year}"
 
@@ -617,9 +531,15 @@ def prefred_date_time_fun1(response):
                   datetime_obj = datetime_obj.replace(hour=hour)
 
           return datetime_obj.isoformat()
-      else:
+      else: 
         return None
 
+# Funtion for date format as per API requirement
+def format_appointment_date(from_date):
+    parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
+    return parsed_date.strftime("%m/%d/%Y")
+
+# extracting day as per prefered date for appointment
 def prefred_date_time_fun(response):
     print("response12",response)
     def get_next_weekday(day_name, use_next=False):
@@ -739,7 +659,6 @@ def prefred_date_time_fun(response):
         return extract_date_from_response(response)
 
     else:
-        # print("response============================",response)
         response=response.replace(',','')
         patterns = [
             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
@@ -765,8 +684,7 @@ def prefred_date_time_fun(response):
             (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %b %Y'),
             (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4})\b', '%d %b %Y'),
     ]
-    
-    
+        
         # Time mappings for periods of the day
         time_mappings = {
             "Morning": 9,
@@ -775,10 +693,8 @@ def prefred_date_time_fun(response):
             "Night": 21
         }
     
-        datetime_obj = None
-    
+        datetime_obj = None    
         for pattern, date_format in patterns:
-            # print(response,'response++')
             match = re.search(pattern, response)
             
             if match:
@@ -806,7 +722,6 @@ def prefred_date_time_fun(response):
                         if datetime_obj:
                             datetime_obj = datetime_obj.replace(hour=hour)
                         else:
-                            # datetime_obj = datetime.combine(datetime.now.date(), datetime.time(hour=hour))
                             datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
     
                     elif len(groups) == 1 and groups[0] in time_mappings:
@@ -815,9 +730,7 @@ def prefred_date_time_fun(response):
                         if datetime_obj:
                             datetime_obj = datetime_obj.replace(hour=hour)
                         else:
-                            datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
-    
-                            # datetime_obj = datetime.combine(datetime.now().date(), datetime.time(hour=hour))
+                            datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)    
                 break
     
         if not datetime_obj:
@@ -826,245 +739,6 @@ def prefred_date_time_fun(response):
         return datetime_obj.isoformat()
 
 # Tool to book appointment
-def book_appointment_old(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
-    data = json.loads(request.body.decode('utf-8'))
-    session_id = data.get('session_id', '')
-    try:
-        request.session[f'book_appointment{session_id}']
-    except:
-        request.session[f'book_appointment{session_id}']='True'
-    
-
-
-    headers = {
-        'Content-Type': 'application/json',
-        'apiKey': f'bearer {auth_token}'}
-
-    # Step 1: Get the list of locations
-    get_locations_url = "https://iochatbot.maximeyes.com/api/location/GetLocationsChatBot"
-    try:
-        locations_response = requests.get(get_locations_url, headers=headers)
-        locations_response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while fetching locations: {e}")
-        return
-    if locations_response.status_code != 200:
-        return f"Failed to get locations. Status code: {locations_response.status_code}"
-    try:
-        locations = locations_response.json()
-    except ValueError:
-        return "Failed to parse locations response as JSON."
-
-    print("Available locations:")
-    result=''
-    valid_ids=[]
-    for idx, location in enumerate(locations):
-        result+=f"{idx + 1}: {location['Name']} (ID: {location['LocationId']})\n"
-        
-        valid_ids.append(location['LocationId'])
-    data = json.loads(request.body.decode('utf-8'))
-    session_id = data.get('session_id', '')    
-    if request.session[f'book_appointment{session_id}']=='True':  
-       result=f" Choose a location by entering the ID: {result}"
-       return result
-    # location_id = transform_input(f"{request.session[f'book_appointment{session_id}']}")
-    location_id = request.session[f'book_appointment{session_id}']
-    #print(request.session[f'book_appointment{session_id}'],'===============================',location_id)
-
-    
-    if location_id:
-      print(transform_input('Thanks for providing location'))
-    # Step 2: Get the list of providers for the selected location
-    get_providers_url = f"https://iochatbot.maximeyes.com/api/scheduledresource/GetScheduledResourcesChatBot?LocationId={location_id}"
-    try:
-        providers_response = requests.get(get_providers_url, headers=headers)
-        providers_response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while fetching providers: {e}")
-        return
-    if providers_response.status_code != 200:
-        return f"Failed to get providers. Status code: {providers_response.status_code}"
-    try:
-        providers = providers_response.json()
-    except ValueError:
-        return "Failed to parse providers response as JSON."
-    try:
-        data = json.loads(request.body.decode('utf-8'))
-        session_id = data.get('session_id', '')
-        print(request.session[f'provider_id{session_id}'],'-----------------------------')
-    except:
-        data = json.loads(request.body.decode('utf-8'))
-        session_id = data.get('session_id', '')
-        request.session[f'provider_id{session_id}']='True'
-    
-    print("Available providers:")
-    result=''
-    for idx, provider in enumerate(providers):
-        
-        result+=f"{idx + 1}: {provider['Name']} (ID: {provider['ScheduleResourceId']})\n"
-   
-    data = json.loads(request.body.decode('utf-8'))
-    session_id = data.get('session_id', '')
-    if request.session[f'provider_id{session_id}']=='True':  
-       
-       result=f" {transform_input('Choose a provider by entering the ID: ')} {result}"
-       return result
-    
-    # provider_id = input(transform_input("Choose a provider by entering the ID: "))
-    provider_id = request.session[f'provider_id{session_id}']
-
-    # Step 3: Get the appointment reasons for the selected provider and location
-    get_reasons_url = f"https://iochatbot.maximeyes.com/api/appointment/appointmentreasonsForChatBot?LocationId={location_id}&SCHEDULE_RESOURCE_ID={provider_id}"
-    try:
-        reasons_response = requests.get(get_reasons_url, headers=headers)
-        reasons_response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while fetching appointment reasons: {e}")
-        return
-        
-    if reasons_response.status_code != 200:
-        return f"Failed to get appointment reasons. Status code: {reasons_response.status_code}"
-    try:
-        reasons = reasons_response.json()
-    except ValueError:
-        return "Failed to parse appointment reasons response as JSON."
-    try:
-        request.session[f'reason_id{session_id}']
-    except:
-        request.session[f'reason_id{session_id}']='True'
-    print("Available reasons:")
-    result=''
-    for idx, reason in enumerate(reasons):
-        #print(f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})")
-        result+=f"{idx + 1}: {reason['ReasonName']} (ID: {reason['ReasonId']})\n"
-    if request.session[f'reason_id{session_id}']=='True':  
-       result=f" {transform_input('Choose a reason by entering the ID: ')} {result}"
-       return result
-
-    reason_id = request.session[f'reason_id{session_id}']
-    # reason_id = input(transform_input("Choose a reason by entering the ID: "))
-
-    # Step 4: Get the open slots for the selected location, provider, and reason
-    preferred = prefred_date_time_fun(prefred_date_time)
-    print("prefred date time",preferred)
-
-    # from_date = "2024-07-20T15:30:00"
-    from_date = preferred
-    print("from_date",from_date)
-    get_open_slots_url = f"https://iochatbot.maximeyes.com/api/appointment/openslotforchatbot?fromDate={from_date}&isOpenSlotsOnly=true"
-    try:
-        open_slots_response = requests.get(get_open_slots_url, headers=headers)
-        open_slots_response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while fetching open slots: {e}")
-        return
-    if open_slots_response.status_code != 200:
-        return f"Failed to get open slots. Status code: {open_slots_response.status_code}"
-    try:
-        open_slots = open_slots_response.json()
-    except ValueError:
-        return "Failed to parse open slots response as JSON."
-    try:
-        request.session[f'slot_id{session_id}']
-    except:
-        request.session[f'slot_id{session_id}']='True'
-    #print("Available open slots:")
-    result=''
-    for idx, slot in enumerate(open_slots):
-        #print(f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})")
-        result+=f"{idx + 1}: {slot['ApptStartDateTime']} - {slot['ApptEndDateTime']} (ID: {slot['OpenSlotId']})"
-    if request.session[f'slot_id{session_id}']=='True':  
-       result=f" {transform_input('Choose an open slot by entering the ID:  ')} {result}"
-       return result
-    open_slot_id = request.session[f'slot_id{session_id}']
-    # open_slot_id = input(transform_input("Choose an open slot by entering the ID: "))
-
-    # Step 5: Send OTP
-    send_otp_url = "https://iochatbot.maximeyes.com/api/common/sendotp"
-    otp_payload = {
-        "FirstName": FirstName,
-        "LastName": LastName,
-        "DOB": DOB,
-        "PhoneNumber": PhoneNumber,
-        "Email": Email}
-    try:
-        otp_response = requests.post(send_otp_url, json=otp_payload, headers=headers)
-        otp_response.raise_for_status()
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while sending OTP: {e}")
-        return
-    if otp_response.status_code != 200:
-        return f"Failed to send OTP. Status code: {otp_response.status_code}"
-    
-    try:
-        request.session['otp']
-    except:
-        request.session[f'otp{session_id}']='True'
-    result=''
-    if request.session[f'otp{session_id}']=='True':  
-       result=f" {transform_input('Enter the OTP received: ')} "
-       return result
-    open_slot_id = request.session[f'slot_id{session_id}']
-    #print("open_slot_id",open_slot_id)
-    otp = request.session[f'otp{session_id}']
-    # otp = input(transform_input("Enter the OTP received: "))
-
-    # Step 6: Validate OTP
-    validate_otp_url = "https://iochatbot.maximeyes.com/api/common/checkotp"
-
-    #otp velidation
-
-    validate_otp_payload = otp_payload.copy()
-    validate_otp_payload["OTP"] = otp
-    try:
-        validate_otp_response = requests.post(validate_otp_url, json=validate_otp_payload, headers=headers)
-        validate_otp_response.raise_for_status()
-        print(validate_otp_response)
-    except requests.exceptions.RequestException as e:
-        print(f"An error occurred while validating OTP: {e}")
-        return
-    if validate_otp_response.status_code != 200:
-        return f"Failed to validate OTP. Status code: {validate_otp_response.status_code}"
-    try:
-        validation_result = validate_otp_response.json()
-    except ValueError:
-        return "Failed to parse OTP validation response as JSON."
-    
-
-    # if not validation_result.get("Isvalidated"):
-    #     return "Invalid OTP. Please try again."
-
-    # Step 7: Book the appointment
-    # book_appointment_url = "https://iochatbot.maximeyes.com/api/appointment/onlinescheduling"
-    # Convert ApptDate to 'MM/DD/YYYY' format
-  #  print()
-    #appointment_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S").strftime("%m/%d/%Y")
-    # parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
-
-    # # Convert the datetime object to the desired format
-    # appointment_date = parsed_date.strftime("%m/%d/%Y")
-    # print(appointment_date)
-    # book_appointment_payload = {
-    #     "OpenSlotId": open_slot_id,
-    #     "ApptDate": appointment_date,
-    #     "ReasonId": reason_id,
-    #     "FirstName": FirstName,
-    #     "LastName": LastName,
-    #     "PatientDob": DOB,
-    #     "MobileNumber": PhoneNumber,
-    #     "EmailId": Email}
-    # print(book_appointment_payload,'book_appointment_payload')
-    # try:
-    #     book_appointment_response = requests.post(book_appointment_url, json=book_appointment_payload, headers=headers)
-    #     book_appointment_response.raise_for_status()
-    #     return book_appointment_response.json()
-    # except requests.exceptions.RequestException as e:
-    #     print(f"An error occurred while booking the appointment: {e}")
-    #     if book_appointment_response.status_code != 200:
-    #         return f"Failed to book appointment. Status code: {book_appointment_response.status_code}"
-
-    return "Appointment scheduled successfully."
-
 def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber, Email, prefred_date_time):
     data = json.loads(request.body.decode('utf-8'))
     session_id = data.get('session_id', '')
@@ -1090,8 +764,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     try:
         locations = locations_response.json()
     except ValueError:
-        return "Failed to parse locations response as JSON."
- 
+        return "Failed to parse locations response as JSON." 
     print("Available locations:")
     result = ''
     valid_ids=''
@@ -1110,9 +783,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         request.session[f'book_appointment{session_id}'] = 'True'
 
         return f"""Invalid location ID. 
-                choose a valid location by entering the ID. {result} """
-        
-    
+                choose a valid location by entering the ID. {result} """    
     if location_id:
         print("Thanks for providing location")
    
@@ -1199,22 +870,14 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     if 'Date is in the past' in preferred:
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
-
-
         message=request.session[f'context{session_id}']
-        
-
         prompt = (
         f"""You are given a text with a placeholder for a preferred date and time. Your task is to remove the placeholder `{prefred_date_time}` from the text while keeping the rest of the content exactly as it is. Here is the text with the placeholder included:
-
             "{message}"
-
-            Please remove the placeholder `{prefred_date_time}` and return the updated text without changing anything else."""
-           
+            Please remove the placeholder `{prefred_date_time}` and return the updated text without changing anything else."""   
         )
         chat_completion = client.chat.completions.create(
         model="gpt-4",
-        # model="gpt-3.5-turbo",
         messages=[
             {
                 "role": "user",
@@ -1227,8 +890,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         print(message,'====================+')
         return 'Please provide a valid date time for Appointment'
     
-    print("Preferred date time", preferred)
- 
+    print("Preferred date time", preferred) 
     from_date = preferred
     print("From date", from_date)
     get_open_slots_url = f"https://iochatbot.maximeyes.com/api/appointment/openslotforchatbot?fromDate={from_date}&isOpenSlotsOnly=true"
@@ -1264,8 +926,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         return f"""Invalid slot ID. 
                 choose a valid slot by entering the ID. {result} """
  
-    # Step 5: Confirm details with the user
-   
+    # Step 5: Confirm details with the user   
     confirmation_message = (
         f"Here are the details of your appointment:\n"
         f"Location ID: {location_id}\n"
@@ -1279,8 +940,6 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         f"Email: {Email}\n"
         f"Is this information correct? (yes/no)"
     )
-
-
     try:
         print(request.session[f'confirmation{session_id}'],'======================')
     except:
@@ -1289,11 +948,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     if request.session[f'confirmation{session_id}'] == "True":
         return confirmation_message
     
-    # Step 6: If user confirms, send OTP
-    # Only after user confirms, proceed with OTP
-
-
-
+    # Step 6: If user confirms, send OTP. Only after user confirms, proceed with OTP
     if request.session[f'confirmation{session_id}'] == 'yes':
         send_otp_url = "https://iochatbot.maximeyes.com/api/common/sendotp"
         otp_payload = {
@@ -1343,37 +998,22 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         if not validation_result.get("Isvalidated"):
             request.session[f'otp{session_id}'] = 'True'
             return "Invalid OTP. Please try again."
-
-        
-    
- 
-        
+         
     elif request.session[f'confirmation{session_id}'] == 'no':
         msg=edit_msg(request)
         return msg
-
     
-    # Step 8: Book the appointment
-   
-     
+    # Step 8: Book the appointment     
     try:
         request.session['appointment_scheduled']
-
-
     except:
         request.session['appointment_scheduled'] = 'True'
     result = ''
     if request.session['appointment_scheduled'] == 'True':
-
-
         book_appointment_url = "https://iochatbot.maximeyes.com/api/appointment/onlinescheduling"
-        # Convert ApptDate to 'MM/DD/YYYY' format
-    
-        appointment_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S").strftime("%m/%d/%Y")
-        parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
-
-        # Convert the datetime object to the desired format
-        appointment_date = parsed_date.strftime("%m/%d/%Y")
+        # Convert ApptDate to 'MM/DD/YYYY' format    
+        appointment_date = format_appointment_date(from_date)
+        
         print(appointment_date)
         book_appointment_payload = {
             "OpenSlotId": open_slot_id,
@@ -1422,8 +1062,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
             Name: {FirstName} {LastName} ,    
             MobileNumber: {PhoneNumber},
             EmailId: {Email}
-            
-            
+        
             """
         print(result)
         # result= transform_input(result)
@@ -1431,11 +1070,26 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         del request.session[f'context{session_id}']
-        return result
-    
-    
+        return result    
     return "Thanks, Have a great day! "
 
+
+# Instruction to guide the language model
+# instruction = """You are a creative assistant for eye care services. You must ONLY provide information directly related to eye health, vision, and eye care services. If the user's query is not related to eye care, respond with EXACTLY this message: 'I apologize, but I can only answer questions related to eye care. If you have any eye-related questions, I'd be happy to help. For more information, please contact 'RoseCity@gmail.com' """
+# def generate_response(user_query, max_length=512, num_return_sequences=1):
+#     prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
+#     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+#     outputs = model.generate
+#         **inputs,
+#         max_length=max_length,
+#         num_return_sequences=num_return_sequences,
+#         pad_token_id=tokenizer.eos_token_id
+#     )
+#     response = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+    
+#     # Extract only the response part
+#     response = response.split("Response:")[-1].strip()    
+#     return response
 
 # Function to generate response using Hugging Face endpoint
 def generate_response(prompt, max_length=512, num_return_sequences=1):
@@ -1443,41 +1097,32 @@ def generate_response(prompt, max_length=512, num_return_sequences=1):
     api_token = os.getenv("HUGGINGFACE_API_TOKEN")
     return call_huggingface_endpoint(prompt, api_url, api_token)
 
+
 # Function to interactively handle the user query
 def verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
   a=f"FirstName: {FirstName}\nLastName: {LastName}\nDOB: {DOB}\nPhoneNumber: {PhoneNumber}\nEmail: {Email}\nprefred_date_time: {prefred_date_time}"
 
-
+# funtion to updated the edited user info
 def update_field(extracted_info, field, value):
     if value and value.lower() != "none":
         extracted_info[field] = value
     return extracted_info
+
+# funtion to validate email
 def validate_email(email):
           # Regular expression pattern for a valid email address
           pattern = r'^[\w\.-]+@[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$'
           return re.match(pattern, email) is not None
+
+# funtion to validate email         
 def validate_phone(phone):
     # Regular expression pattern for a valid US phone number
     pattern = r'^\d{10}$|^\(\d{3}\) \d{3}-\d{4}$'
     return re.match(pattern, phone) is not None
-def handle_user_query1(request,user_query):
-    # Identify the user's intent
-    
-    # data = json.loads(request.body.decode('utf-8'))
-    # intent = identify_intent_practice_question(user_query,data.get('practice1_details', ''))
-    
-    
-    # if 'booking an appointment' in intent  or 'booking ' in intent or 'Booking' in intent or  'not available' in intent or 'appointment' in user_query :
-    #     pass
-    # else:
-    #     request.session['context']=''
-    #     return intent
-   
 
+# Handling user query
+def handle_user_query_postprocess(request,user_query):
     intent = identify_intent(user_query)
-    
-
-
     if "greeting" in intent.lower():
         prompt = "Hello! How can I assist you today? Do you need help with booking an appointment or something else?"
         user_response = transform_input(prompt)
@@ -1488,9 +1133,7 @@ def handle_user_query1(request,user_query):
     data =data.get('practice1_details', '')
     if "static" in intent.lower():
         static_response = identify_intent_practice_question(user_query, data)
-    # if static_response != "Sorry, I don't understand your request. Can you please provide more details?":
         if static_response:
-            # del request.session[f'context{session_id}']
             delete_session(request,session_id)
             return static_response
    
@@ -1500,12 +1143,9 @@ def handle_user_query1(request,user_query):
       print(f"Extracted info: {extracted_info}")
       
       fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email','Preferred date or time']
-      # missing_fields = [field for field in fields if not extracted_info.get(field)]
       
       missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
-      print("missing fields",missing_fields)
-      
-      
+      print("missing fields",missing_fields)            
      
       fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email','Preferred date or time']  
       if 'Email' not in missing_fields:
@@ -1516,7 +1156,6 @@ def handle_user_query1(request,user_query):
                 if validate_email(extracted_email)==False:
                     prompt = f"Please provide your a valid Email address the email you provided is not valid" 
                     user_response = transform_input(prompt)
-                    # user_response="Please provide your a valid Email address the email you provided is not valid" 
                     data = json.loads(request.body.decode('utf-8'))
                     session_id = data.get('session_id', '')
                     message=request.session[f'context{session_id}']
@@ -1538,7 +1177,6 @@ def handle_user_query1(request,user_query):
                     message=request.session[f'context{session_id}']
                     message=message.replace(f'{extracted_PhoneNumber}','')
                     request.session[f'context{session_id}']=message
-                    # user_response="Please provide your a valid Phone Number the one you provided is not valid" 
                     return user_response   
         except:
             pass
@@ -1553,7 +1191,6 @@ def handle_user_query1(request,user_query):
      
       while missing_fields or len(missing_fields)==0:
         while missing_fields:
-            #print("missing fileds in userhandel",missing_fields)
             prompt = f"Please provide your {missing_fields}: " 
             user_response = transform_input(prompt)
             additional_info = fetch_info_openai(user_response)
@@ -1562,13 +1199,6 @@ def handle_user_query1(request,user_query):
               
               if not extracted_info[key] and key in additional_info:
                   extracted_info[key] = additional_info[key]
-
-            # if field == "Email" and not user_response.strip():
-            #     extracted_info["Email"] = "test@gmail.com"
-            # else:
-            #     additional_info = fetch_info_openai(user_response)
-            #     if field in additional_info:
-            #         extracted_info = update_field(extracted_info, field, additional_info[field])
 
             if 'DateOfBirth' in extracted_info and extracted_info['DateOfBirth']:
                 extracted_info['DateOfBirth'] = convert_date_format(extracted_info['DateOfBirth'])
@@ -1584,32 +1214,21 @@ def handle_user_query1(request,user_query):
         Email = extracted_info.get('Email')
         prefred_date_time = extracted_info.get('Preferred date or time')
 
-        # prefred_date_time = date_time_format(prefred_date_time)
-        # print(prefred_date_time,'prefred_date_time')
-
         verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
-
 
         # Get authentication token
         auth_token = get_auth_token(vendor_id, vendor_password, account_id, account_password)
         if not auth_token:
             return "Failed to authenticate."
-
-
        
         if 'confirmation' in request.session:
             if request.session[f'confirmation{session_id}'].lower() == 'no':
                 edit_response = edit_msg(request)
                 print("led",edit_response)
-                # request.session[f'context{session_id}'] = json.dumps(extracted_info)S
                 return edit_response
 
         # Book the appointment
-        # try:
         book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
-        # except:
-        #     data = json.loads(request.body.decode('utf-8'))
-        #     book_appt=f"Please  contact : {data.get('practice_email', '')} "
         
         try:
             data=json.loads(request.body.decode('utf-8'))
@@ -1621,66 +1240,13 @@ def handle_user_query1(request,user_query):
         except:
             pass
 
-
         return book_appt
     
   #If the intent is not related to booking, generate a response using the fine-tuned model
     else:
-        # response = generate_response(user_query)
-        data = json.loads(request.body.decode('utf-8'))
-        data =data.get('practice_name', '')
-        return f"Sorry, I can only help with {data} related questions. If you have any inquiries about our services, appointment scheduling, or eye care in general, feel free to ask!"
+        response = generate_response(user_query)
+        return response
 
-# Main function to handle user query
-# def handle_user_query_me(request, user_query):
-#     # Identify the user's intent
-#     print("user_query", user_query)
-#     intent = identify_intent(user_query)
-#     print(f"Identified intent: {intent}")
-
-#     # Initialize required information if not already in session
-#     if 'required_info' not in request.session:
-#         request.session['required_info'] = {
-#             'first_name': None,
-#             'last_name': None,
-#             'dob': None,
-#             'mobile_number': None,
-#             'email': None
-#         }
-
-#     # If the intent is to reschedule an appointment
-#     if intent == "rescheduling":
-#         missing_info = ask_for_missing_info(request, request.session['required_info'])
-#         if missing_info:
-#             return missing_info
-
-#         # Extract required information
-#         extracted_info = fetch_info(user_query)
-#         print(type(extracted_info))
-#         print(f"Extracted info: {extracted_info}")
-
-#         # Update session with extracted information
-#         request.session['required_info'].update(extracted_info)
-
-#         # Check for any missing information
-#         missing_info = ask_for_missing_info(request, request.session['required_info'])
-#         if missing_info:
-#             return missing_info
-
-#         # Get authentication token
-#         auth_token = get_auth_token(vendor_id, vendor_password, account_id, account_password)
-#         if not auth_token:
-#             return "Failed to authenticate."
-
-#         # Reschedule the appointment and get open slots
-#         required_info = request.session['required_info']
-#         open_slots = reschedule_appointment(auth_token, required_info['last_name'], required_info['dob'])
-#         return open_slots
-
-#     # If the intent is not related to rescheduling, generate a response
-#     else:
-#         response = generate_response(user_query)
-#         return response
 def delete_session(request,session_id):
     print('hello')
     # data = json.loads(request.body.decode('utf-8'))
@@ -1866,7 +1432,6 @@ def func1(request):
     data = json.loads(request.body.decode('utf-8'))
     message = data.get('input', '')
     session_id = data.get('session_id', '')
-    #print(message,'----------------')
     return JsonResponse({"response": 'success'})
 
 @csrf_exempt
@@ -1889,38 +1454,20 @@ def handle_user_query(request):
         request.session[f'context{session_id}']=message
     
     try:
-        # data = json.loads(request.body)
-        # print(f"Received data: {data}")
- 
-        # query = data.get("query")
-        # if not query:
-        #     return JsonResponse({"error": "Missing 'query' in request data"}, status=400)
- 
-        # if not isinstance(query, dict):
-        #     return JsonResponse({"error": "Invalid JSON format, expected a JSON object for 'query'"}, status=400)
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         input_message = request.session[f'context{session_id}']
         if not input_message:
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 
-        try:
-            response = handle_user_query1(request,input_message)
-        except:
-            print('error in handle_user_query1')
-            data = json.loads(request.body.decode('utf-8'))
-            response = f"please contact our support team :{data.get('practice_email', '')}"
-            return response
-        # print(response,'response----------------')
+        # try:
+        response = handle_user_query_postprocess(request,input_message)
         if response=='none' or response==None:
             data = json.loads(request.body.decode('utf-8'))
 
             response=f"Please contact :{data.get('practice_email', '')} "
             return response
-
-            # response = generate_response(input_message)
         return response
-        # return JsonResponse({"response": response})
    
     except json.JSONDecodeError as e:
         print(f"JSON decoding error: {e}")
