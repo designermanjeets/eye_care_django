@@ -265,25 +265,6 @@ def edit_msg(request):
         del request.session[f'confirmation{session_id}']
         return handle_user_query_postprocess(request,context)
 
-# function to handle greeting    
-def greeting_handle(user_query):
-    prompt = (
-        f"""Identify the user query: "{user_query}".
-        f"Ask the user for any additional help they need regarding their appointment request, using a warm and friendly tone: '{user_query}'"""
-    )
-    chat_completion = client.chat.completions.create(
-      model="gpt-3.5-turbo",
-      messages=[
-          {
-              "role": "user",
-              "content": prompt,
-          }
-      ]
-    )
-    # Extract the intent from the response
-    intent = chat_completion.choices[0].message.content.strip()
-    return intent
-
 # function for preferred time appointment
 def date_time_format(date_time):
     date_pattern = r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b'
@@ -1140,7 +1121,6 @@ def handle_user_query_postprocess(request,user_query):
     # If the intent is to book an appointment
     if "booking an appointment" in intent.lower() or "schedule appointment" in intent.lower() or "book" in intent.lower():
       extracted_info = fetch_info_openai(user_query)
-      print(f"Extracted info: {extracted_info}")
       
       fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email','Preferred date or time']
       
@@ -1248,7 +1228,6 @@ def handle_user_query_postprocess(request,user_query):
         return response
 
 def delete_session(request,session_id):
-    print('hello')
     # data = json.loads(request.body.decode('utf-8'))
     # session_id = data.get('session_id', '')
     if session_id=='2':
