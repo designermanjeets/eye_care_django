@@ -19,7 +19,7 @@ import requests
 from datetime import datetime, timedelta,date
 import re
 import uuid
-from pages.model_loader import *
+# from pages.model_loader import *
 # import torch
 # from transformers import AutoTokenizer, AutoModelForCausalLM
 # from peft import PeftModel
@@ -29,7 +29,10 @@ load_dotenv()
 
 # Initialize the OpenAI client
 # open_api_key = os.getenv("OPENAI_API_KEY")
+
 open_api_key = ''
+hugging_face_api_token = ""
+
 client = OpenAI(api_key=open_api_key)
 
 # Initialize the API credentials
@@ -61,7 +64,12 @@ def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_fac
         try:
             response = requests.post(api_url, headers=headers, json=data)
             response.raise_for_status()
-            return response.json()[0]["generated_text"]
+            try:
+                response=(response.json()[0]["generated_text"]).split('Response:')[1]
+            except:
+                response=(response.json()[0]["generated_text"])
+            print("response----",response)
+            return response
         except requests.exceptions.RequestException as e:
             if attempt < retries - 1:
                 sleep_time = backoff_factor * (2 ** attempt)
@@ -1128,26 +1136,29 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
 
 # Instruction to guide the language model
 instruction = """You are a creative assistant for eye care services. You must ONLY provide information directly related to eye health, vision, and eye care services. If the user's query is not related to eye care, respond with EXACTLY this message: 'I apologize, but I can only answer questions related to eye care. If you have any eye-related questions, I'd be happy to help. For more information, please contact 'RoseCity@gmail.com' """
-def generate_response(user_query, max_length=512, num_return_sequences=1):
-    prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
-    inputs = tokenizer(prompt, return_tensors="pt").to(base_model.device)
-    outputs =base_model.generate(
-        **inputs,
-        max_length=max_length,
-        num_return_sequences=num_return_sequences,
-        pad_token_id=tokenizer.eos_token_id
-    )
-    response = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+# def generate_response(user_query, max_length=512, num_return_sequences=1):
+#     prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
+#     inputs = tokenizer(prompt, return_tensors="pt").to(base_model.device)
+#     outputs =base_model.generate(
+#         **inputs,
+#         max_length=max_length,
+#         num_return_sequences=num_return_sequences,
+#         pad_token_id=tokenizer.eos_token_id
+#     )
+#     response = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
     
-    # Extract only the response part
-    response = response.split("Response:")[-1].strip()    
-    return response
+#     # Extract only the response part
+#     response = response.split("Response:")[-1].strip()    
+#     return response
 
 # Function to generate response using Hugging Face endpoint
-# def generate_response(prompt, max_length=512, num_return_sequences=1):
-#     api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"  
-#     api_token = os.getenv("HUGGINGFACE_API_TOKEN")
-#     return call_huggingface_endpoint(prompt, api_url, api_token)
+def generate_response(user_query, max_length=512, num_return_sequences=1):
+    prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
+
+    api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"  
+    # api_token = os.getenv("HUGGINGFACE_API_TOKEN")
+   
+    return call_huggingface_endpoint(prompt, api_url, hugging_face_api_token)
 
 
 # Function to interactively handle the user query
@@ -1323,6 +1334,10 @@ def handle_user_query_postprocess(request,user_query):
   #If the intent is not related to booking, generate a response using the fine-tuned model
     else:
         response = generate_response(user_query)
+        print(response,'response--------')
+        data = json.loads(request.body.decode('utf-8'))
+        session_id = data.get('session_id', '')
+        delete_session(request,session_id)
         return response
 
 def delete_session(request,session_id):
