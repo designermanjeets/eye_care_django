@@ -57,6 +57,7 @@
       <!--begin::Input-->
       <textarea id="chatbox" class="form-control form-control-flush mb-3" rows="1" data-kt-element="input"
         placeholder="Type a message"></textarea>
+        <input hidden id ='session_uuid' value="{{session_id}}">
       <!--end::Input-->
         <!--begin:Toolbar-->
         <div class="d-flex flex-stack">
@@ -339,9 +340,9 @@ No
       location.reload();
     });
 
-    $('#chat_submit').click(function (e) {
-      e.preventDefault();
+    function send_message(){
       var message = $('#chatbox').val();
+      var session_uuid = $('#session_uuid').val();
       if (message.trim() !== '') {
         // Disable the send button and show the bot typing indicator
         $('#chat_submit').attr('disabled', true);
@@ -378,7 +379,7 @@ No
           },
           data: JSON.stringify({
               input: message,
-              session_id: session_id,
+              session_id: session_uuid,
               practice_address:practice_add,
               practice_name:practicde_name,
               practice_hour:practice_hour,
@@ -426,6 +427,19 @@ No
           }
         });
       }
+   
+    }
+
+
+    $('#chat_submit').click(function (e) {
+      e.preventDefault();
+      send_message()
+     });
+     $('#chatbox').keydown(function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { // Check for Enter key without Shift
+            e.preventDefault(); // Prevent the default behavior of the Enter key (new line)
+            send_message(); // Call the send_message function
+        }
     });
 
   });

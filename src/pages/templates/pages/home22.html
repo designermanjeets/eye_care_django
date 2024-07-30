@@ -1,8 +1,11 @@
 {% extends "layouts/index.html" %}
 {% load static %}
 
-{% block title %}Practice 1{% endblock %}
-{% block heading %} Practice 1{% endblock %}
+
+
+{% block title %}Practice 2{% endblock %}
+{% block heading %} Practice 2{% endblock %}
+
 {% block body %}
 
 <!--begin::Content-->
@@ -54,7 +57,6 @@
       <!--begin::Input-->
       <textarea id="chatbox" class="form-control form-control-flush mb-3" rows="1" data-kt-element="input"
         placeholder="Type a message"></textarea>
-        <input hidden id ='session_uuid' value="{{session_id}}">
       <!--end::Input-->
         <!--begin:Toolbar-->
         <div class="d-flex flex-stack">
@@ -103,23 +105,18 @@
     }
     return cookieValue;
   }
-  const session_id='1';
+
+  const session_id = '2';
   const csrftoken = getCookie('csrftoken');
-  const practice_add=` U.S Corporate Office
-                      Rose City Eye Care 
-                      5423 NE Central Street 
-                      Suite 40
-                      New York  12322  `;
-  const practicde_name='Rose City Eye Care'; 
-  const practice_hour='9 AM to 4 PM PST';                                     
-  const practice_email='RoseCity@gmail.com';   
-  const practice1_details=`
+  const practice_add=` `;
+  const practicde_name='First Insight Vision'; 
+  const practice_hour='9 AM to4 PM PST';                                     
+  const practice_email='eyecare@gmail.com';   
+  const practice1_details=`Practice Name: First Insight Vision 
 
-  Practice Name: Rose City Eye Care 
+Practice Hours: 9 AM to4 PM PST 
 
-Practice Hours: 8 AM to 8 PM PST 
-
-Practice Email: RoseCity@gmail.com 
+Practice Email: eyecare@gmail.com 
 
  
 
@@ -129,43 +126,25 @@ U.S Corporate Office
 
 Rose City Eye Care 
 
-6723 NE Bennett Street 
+5423 NE Central Street 
 
-Suite 200 
+Suite 40 
 
-Hillsboro, Oregon 97124 
+New York  12322 
 
-Driving Directions 
-
- 
-
-India Offices 
-
-Rose City Eye Care 
-
-2nd Floor, Server Space, 
-
-AG Technology Park 
-
-Off ITI Road 
-
-Survey No. 127/1A 
-
-Plot No. 8 
-
-Aundh, Pune – 411 007 
+  
 
  
 
-Insurance Coverage list : https://www.first-insight.com/ link 
+Insurance Coverage list : https://www.maximeyes.com/ link 
 
  
 
 We have below providers: 
 
-Dr Anderson (Pediatrics) 
+Dr Willamson (Pediatrics) 
 
-Dr. Anderson have 12 Year of extensive experience in Pediatric eye surgeries 
+Dr. Willamson have 18 Year of extensive experience in Pediatric eye surgeries 
 
 Dr. John  (Surgeon) 
 
@@ -177,23 +156,23 @@ We have below services
 
 OPD 
 
-Cataract Surgery 
-
 Glaucoma 
+
+Lasik Surgery 
 
  
 
            Product offered: 
 
-Complete Eye check up: 200$ 
+Complete Eye check up: 600$ 
 
-Comprehensive Eye checkup: 100$ 
+Comprehensive Eye checkup: 400$ 
 
  
 
             Parking instructions: 
 
-Please park your vehicle in parking at L1 level in parking reserved for our clinic 
+Please park your vehicle in parking at L2 level in parking reserved for our clinic 
 
  
 
@@ -205,13 +184,13 @@ Last medical report, Insurance card copy
 
 Cancelation or no show policy: 
 
-Refer google.com for cancelation policy 
+Refer maximeyes.com for cancelation policy 
 
  
 
 Payment types accepted: 
 
-VISA, Credit card, Gpay, Cash, CareCredit 
+ Cash and GPay 
 
  
 
@@ -223,7 +202,7 @@ Yes, With several credit card we do provide EMI option
 
 What languages are spoken in your office?: 
 
-Spanish, English 
+ English 
 
  
 
@@ -235,7 +214,7 @@ Yes
 
 Do you offer any discounts? (Military, vetrans, childern, ect?) 
 
-Yes, we do offer 10% discount on Military employees 
+No 
 
 Do you have options for patietns to fill out paper work online? 
 
@@ -245,17 +224,13 @@ Yes, It is there and we recommend to fill before coming to clinic, it will save 
 
  
 
- 
-
-Do you want to allow patients to make payments online?: 
-
-Yes, We do support VISA Credi card, Gpay, Cash 
+  
 
   
 
 Do you want to allow online booking?: 
 
-Yes, https://booking,max.com 
+Yes, https://booking,maximeyes.com 
 
  
 
@@ -267,9 +242,7 @@ No
 
 Do you offer a wait list? 
 
-Yes, but there is not guarantee if you get appointment or not. 
-  
-  
+No 
   
   `;                                  
   
@@ -277,8 +250,8 @@ Yes, but there is not guarantee if you get appointment or not.
     
     let typingTimer;
 
-    var doneTypingInterval1 = 90000; // 50 seconds
-    var doneTypingInterval2 = 90000; // 50 seconds
+    var doneTypingInterval1 = 90000; // 60 seconds
+    var doneTypingInterval2 = 90000; // 60 seconds
 
     // Function to handle typing in the chatbox
  
@@ -289,7 +262,7 @@ Yes, but there is not guarantee if you get appointment or not.
         doneTyping1();
         // Define a flag to check if there's been input after doneTyping1
         let inputAfterDoneTyping1 = false;
-          
+
         // Check if there's been any input after doneTyping1
         $('#chatbox').on('input', function() {
           inputAfterDoneTyping1 = true;
@@ -365,11 +338,10 @@ Yes, but there is not guarantee if you get appointment or not.
       // Reload the page
       location.reload();
     });
-    function send_message(){
-      
-      var message = $('#chatbox').val();
-      var session_uuid = $('#session_uuid').val();
 
+    $('#chat_submit').click(function (e) {
+      e.preventDefault();
+      var message = $('#chatbox').val();
       if (message.trim() !== '') {
         // Disable the send button and show the bot typing indicator
         $('#chat_submit').attr('disabled', true);
@@ -406,7 +378,7 @@ Yes, but there is not guarantee if you get appointment or not.
           },
           data: JSON.stringify({
               input: message,
-              session_id: session_uuid,
+              session_id: session_id,
               practice_address:practice_add,
               practice_name:practicde_name,
               practice_hour:practice_hour,
@@ -437,15 +409,11 @@ Yes, but there is not guarantee if you get appointment or not.
                 </div>
               </div>
             `);
-            // if (response.includes('Thanks, Have a great day!')) {
-            //   $('#kt_chat_messenger_footer').hide();  }// Hides the div with id `myDiv`
-                // $('#chat_submit').hide();
-                // $('#restart_button').show();
+
             // Scroll to the bottom of the chat
             var chatBody = $('#kt_chat_messenger_body .scroll-y');
             chatBody.scrollTop(chatBody[0].scrollHeight);
            
-            // Re-enable the send button and hide the bot typing indicator
             $('#chat_submit').attr('disabled', false);
             $('#bot-typing').hide();
           },
@@ -458,20 +426,56 @@ Yes, but there is not guarantee if you get appointment or not.
           }
         });
       }
-    
-    }
-    
-    $('#chat_submit').click(function (e) {
-      e.preventDefault()
-      send_message()
-      });
-    $('#chatbox').keydown(function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) { // Check for Enter key without Shift
-            e.preventDefault(); // Prevent the default behavior of the Enter key (new line)
-            send_message(); // Call the send_message function
-        }
     });
 
   });
 </script>
 {% endblock %}
+
+<!-- 
+
+
+success: function (response) {
+  // Append bot's response to the chat window
+  $('#kt_chat_messenger_body .scroll-y').append(`
+      <div class="d-flex justify-content-start mb-10">
+          <div class="d-flex flex-column align-items-start">
+              <div class="d-flex align-items-center mb-2">
+                  <div class="symbol symbol-35px symbol-circle">
+                      <img alt="Pic" src="{% static 'static/images/avatars/300-25.jpg' %}" />
+                  </div>
+                  <div class="ms-3">
+                      <a href="#" class="fs-5 fw-bold text-gray-900 text-hover-primary me-1">Bot</a>
+                      <span class="text-muted fs-7 mb-1">Just now</span>
+                  </div>
+              </div>
+              <div class="p-5 rounded bg-light-info text-dark fw-semibold mw-lg-400px text-start"
+                  data-kt-element="message-text">${response.response}</div>
+          </div>
+      </div>
+  `);
+
+  // Scroll to the bottom of the chat
+  var chatBody = $('#kt_chat_messenger_body .scroll-y');
+  chatBody.scrollTop(chatBody[0].scrollHeight);
+
+  // Re-enable the send button and hide the bot typing indicator
+  $('#chat_submit').attr('disabled', false);
+  $('#bot-typing').hide();
+
+  // Send a message after 2 minutes
+  setTimeout(function() {
+      $('#kt_chat_messenger_body .scroll-y').append(`
+          <div class="d-flex justify-content-end mb-10">
+              <div class="d-flex flex-column align-items-end text-right">
+                  <div class="p-5 rounded bg-light-primary text-dark fw-semibold mw-lg-400px text-start"
+                      data-kt-element="message-text">This is a delayed message after 2 minutes.</div>
+              </div>
+          </div>
+      `);
+
+      // Scroll to the bottom of the chat after adding the delayed message
+      chatBody.scrollTop(chatBody[0].scrollHeight);
+  }, 120000); // 120000 milliseconds = 2 minutes
+}, -->
+

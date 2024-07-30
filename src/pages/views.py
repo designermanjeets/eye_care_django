@@ -18,6 +18,7 @@ import json
 import requests
 from datetime import datetime, timedelta,date
 import re
+import uuid
 from pages.model_loader import *
 # import torch
 # from transformers import AutoTokenizer, AutoModelForCausalLM
@@ -316,10 +317,10 @@ def conf_intent(request):
     # Update session based on response
     if response_content == 'yes':
         request.session[f'confirmation{session_id}'] = 'yes'
-        request.session[f'context{session_id}'] = response_content
+        
     elif response_content == 'no':
         request.session[f'confirmation{session_id}'] = 'no'
-        request.session[f'context{session_id}'] = response_content
+        
     else:
         request.session[f'confirmation{session_id}'] = 'True'
         request.session[f'context{session_id}'] = response_content
@@ -1230,7 +1231,9 @@ def handle_user_query_postprocess(request,user_query):
                     return user_response   
         except:
             pass
-      
+      if len(missing_fields)==1 and ('PhoneNumber' in missing_fields or 'Email' in missing_fields):
+          print('only one thing is present' ,missing_fields)
+          missing_fields=[]
       if missing_fields:
 
         prompt = f"Please provide your {missing_fields}: " 
@@ -1278,6 +1281,31 @@ def handle_user_query_postprocess(request,user_query):
                 return edit_response
 
         # Book the appointment
+        print(prefred_date_time,'prefred_date_time -----------------')
+        preferred = prefred_date_time_fun(prefred_date_time)
+        print(type(preferred),'=========',preferred)
+        if 'Date is in the past' in preferred:
+            data = json.loads(request.body.decode('utf-8'))
+            session_id = data.get('session_id', '')
+            message=request.session[f'context{session_id}']
+            prompt = (
+            f"""You are given a text with a placeholder for a preferred date and time. Your task is to remove the placeholder `{prefred_date_time}` from the text while keeping the rest of the content exactly as it is. Here is the text with the placeholder included:
+                "{message}"
+                Please remove the placeholder `{prefred_date_time}` and return the updated text without changing anything else."""   
+            )
+            chat_completion = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ]
+            )
+            message = chat_completion.choices[0].message.content.strip()
+            request.session[f'context{session_id}']=message
+            print(message,'====================+')
+            return 'Please provide a valid date time for Appointment'  
         book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
         
         try:
@@ -1300,124 +1328,90 @@ def handle_user_query_postprocess(request,user_query):
 def delete_session(request,session_id):
     # data = json.loads(request.body.decode('utf-8'))
     # session_id = data.get('session_id', '')
-    if session_id=='2':
+    
 
         try:
-            del request.session[f'context2']
+            del request.session[f'context{session_id}']
         except:
             print('Not able to delete context')
         try:
-            del request.session['book_appointment2']
+            del request.session[f'book_appointment{session_id}']
         except:
             print('Not able to delete book_appointment')
         try:
-            del request.session['provider_id2']
+            del request.session[f'provider_id{session_id}']
         except:
             print('Not able to delete provider_id')
         try:
-            del request.session['reason_id2']
+            del request.session[f'reason_id{session_id}']
         except:
             print('Not able to delete reason_id')
         try:
-            del request.session['slot_id2']
+            del request.session[f'slot_id{session_id}']
         except:
             print('Not able to delete slot_id')
         try:
-            del request.session['otp2']
+            del request.session[f'otp{session_id}']
         except:
             print('Not able to delete otp')
         try:
-            del request.session['confirmation2']
+            del request.session[f'confirmation{session_id}']
         except:
             print('Not able to delete confirmation')
         try:
-            del request.session['edit_msg2']
+            del request.session[f'edit_msg{session_id}']
         except:
             print('Not able to edit_msg')
         try:
-            del request.session['return_response2']
+            del request.session[f'return_response{session_id}']
         except:
             print('Not able to delete return_response')
         try:
-            del request.session['appointment_scheduled2']
+            del request.session[f'appointment_scheduled{session_id}']
         except:
             print('Not able to delete appointment_scheduled')
 
 
-    elif session_id=='1':
-        try:
-            del request.session[f'context1']
-        except:
-            print('Not able to delete context')
-    
-        try:
-            del request.session['book_appointment1']
-        except:
-            print('Not able to delete book_appointment')
-        
-        try:
-            del request.session['provider_id1']
-        except:
-            print('Not able to delete provider_id')
-        
-        try:
-            del request.session['reason_id1']
-        except:
-            print('Not able to delete reason_id')
-        
-        try:
-            del request.session['slot_id1']
-        except:
-            print('Not able to delete slot_id')
-    
-        try:
-            del request.session['otp1']
-        except:
-            print('Not able to delete otp')
-        
-        try:
-            del request.session['return_response1']
-        except:
-            print('Not able to delete return_response')
-        try:
-            del request.session['confirmation1']
-        except:
-            print('Not able to delete confirmation')
-    
-        try:
-            del request.session['appointment_scheduled1']
-        except:
-            print('Not able to delete appointment_scheduled')
-        try:
-            del request.session['edit_msg1']
-        except:
-            print('Not able to edit_msg')
-    
-    print('all session deleted deleted')
-    return request
+   
+        return request
 
 def home(request):
+    if 'session_id1' in request.session:
+        session_id=request.session['session_id1']
+    else:
+
+        request.session['session_id1'] = str(uuid.uuid4())
+        session_id=request.session['session_id1'] 
+
     # request.session._session_key_prefix = 'view1'
     context = {
+        'session_id':session_id,
         "debug": settings.DEBUG,
         "django_ver": get_version(),
         # "python_ver": os.environ["PYTHON_VERSION"],
     }
     if request.method=='GET':
         
-        delete_session(request,'1')
+        delete_session(request,session_id)
        
     return render(request, "pages/home.html", context)
 def home2(request):
     # request.session._session_key_prefix = 'view2'
+    if 'session_id2' in request.session:
+        session_id=request.session['session_id2']
+    else:
+
+        request.session['session_id2'] = str(uuid.uuid4())
+        session_id=request.session['session_id2'] 
 
     context = {
+        'session_id':session_id,
         "debug": settings.DEBUG,
         "django_ver": get_version(),
         # "python_ver": os.environ["PYTHON_VERSION"],
     }
     if request.method=='GET':
-        delete_session(request,'2')
+        delete_session(request,session_id)
     return render(request, "pages/home2.html", context)
     
 @csrf_exempt
