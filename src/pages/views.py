@@ -300,7 +300,7 @@ def conf_intent(request):
     3. **If the user indicates they want to change something but does not specify what:**
         - Respond with only the word 'no'.
 
-    Be concise and provide only the necessary response based on the instructions above.
+    Be concise and provide only the necessary response based on the instructions above.and for yes or no provide only yes or no.
     """
 
     chat_completion = client.chat.completions.create(
@@ -316,8 +316,10 @@ def conf_intent(request):
     # Update session based on response
     if response_content == 'yes':
         request.session[f'confirmation{session_id}'] = 'yes'
+        request.session[f'context{session_id}'] = response_content
     elif response_content == 'no':
         request.session[f'confirmation{session_id}'] = 'no'
+        request.session[f'context{session_id}'] = response_content
     else:
         request.session[f'confirmation{session_id}'] = 'True'
         request.session[f'context{session_id}'] = response_content
