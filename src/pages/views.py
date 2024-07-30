@@ -25,14 +25,14 @@ import uuid
 # from peft import PeftModel
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv('.env.development')
 
 # Initialize the OpenAI client
-# open_api_key = os.getenv("OPENAI_API_KEY")
+open_api_key = os.getenv("OPENAI_API_KEY")
+hugging_face_api_token = os.getenv("hugging_face_api_token")
 
-open_api_key = ''
-hugging_face_api_token = ""
-
+# open_api_key = ''
+# hugging_face_api_token = ""
 client = OpenAI(api_key=open_api_key)
 
 # Initialize the API credentials
