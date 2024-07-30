@@ -18,6 +18,7 @@ import json
 import requests
 from datetime import datetime, timedelta,date
 import re
+from pages.model_loader import *
 # import torch
 # from transformers import AutoTokenizer, AutoModelForCausalLM
 # from peft import PeftModel
@@ -197,7 +198,7 @@ def identify_intent_practice_question(user_query,data):
     Avoid formal language; aim for a friendly and human-like tone."""
     )
     chat_completion = client.chat.completions.create(
-      model="gpt-4",
+      model="gpt-3.5-turbo",
       messages=[
          
           {
@@ -264,6 +265,67 @@ def edit_msg(request):
         del request.session[f'edit_msg{session_id}']
         del request.session[f'confirmation{session_id}']
         return handle_user_query_postprocess(request,context)
+
+
+def conf_intent(request):
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')
+    
+    # Retrieve current appointment details from the session
+    context = request.session.get(f'context{session_id}', '')
+    print("Current context:", context)
+    msg = request.session.get(f'confirmation{session_id}', '')
+    print("User's response:", msg)
+    
+    # Replace the old message with a space in the context
+    context = context.replace(msg.strip(), " ")
+    print("Updated context after replacement:", context)
+
+    # User's response and context prompt
+    prompt = f"""
+    You have the following appointment details:
+    {context}
+
+    The user responded: '{msg}'
+
+    Based on the user's response, provide the output as follows:
+
+    1. **If the user wants to update their details :**
+    this is my old context {context} and I want to update this using the user's response: {msg}
+    -respond with updated context
+
+    2. **If the user confirms the details are correct:**
+        - Respond with only the word 'yes'.
+
+    3. **If the user indicates they want to change something but does not specify what:**
+        - Respond with only the word 'no'.
+
+    Be concise and provide only the necessary response based on the instructions above.
+    """
+
+    chat_completion = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    response_content = chat_completion.choices[0].message.content.strip()
+    print("AI response:", response_content)
+    
+    # Update session based on response
+    if response_content == 'yes':
+        request.session[f'confirmation{session_id}'] = 'yes'
+    elif response_content == 'no':
+        request.session[f'confirmation{session_id}'] = 'no'
+    else:
+        request.session[f'confirmation{session_id}'] = 'True'
+        request.session[f'context{session_id}'] = response_content
+        print("New context:", response_content)
+        
+    print("Final context in session:", request.session.get(f'context{session_id}', ''))
+
+    return handle_user_query_postprocess(request, response_content)
 
 # function for preferred time appointment
 def date_time_format(date_time):
@@ -655,6 +717,8 @@ def prefred_date_time_fun(response):
             (r'\b(Morning|Afternoon|Evening|Night)\b', None),
             (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m/%d/%Y'),
             (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m-%d-%Y'),
+            (r'\b(0[1-9]|[12][0-9]|3[01])(\/|-)(0[1-9]|1[0-2])(\/|-)(19|20)\d{2}\b', '%d/%m/%Y'),
+            (r'\b(0[1-9]|[12][0-9]|3[01])(\/|-)(0[1-9]|1[0-2])(\/|-)(19|20)\d{2}\b', '%d-%m-%Y'),
             (r'\b(\d{4})-(\d{2})-(\d{1,2})\b', '%Y-%m-%d'),
             (r'\b(\d{2})/(\d{1,2})/(\d{4})\b', '%m/%d/%Y'),
             (r'\b(\d{4})/(\d{2})/(\d{1,2})\b', '%Y/%m/%d'),
@@ -858,7 +922,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
             Please remove the placeholder `{prefred_date_time}` and return the updated text without changing anything else."""   
         )
         chat_completion = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-3.5-turbo",
         messages=[
             {
                 "role": "user",
@@ -984,6 +1048,10 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         msg=edit_msg(request)
         return msg
     
+    else :
+        intent=request.session[f'confirmation{session_id}']
+        context = conf_intent(request)
+        return context
     # Step 8: Book the appointment     
     try:
         request.session['appointment_scheduled']
@@ -1056,27 +1124,27 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
 
 
 # Instruction to guide the language model
-# instruction = """You are a creative assistant for eye care services. You must ONLY provide information directly related to eye health, vision, and eye care services. If the user's query is not related to eye care, respond with EXACTLY this message: 'I apologize, but I can only answer questions related to eye care. If you have any eye-related questions, I'd be happy to help. For more information, please contact 'RoseCity@gmail.com' """
-# def generate_response(user_query, max_length=512, num_return_sequences=1):
-#     prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
-#     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-#     outputs = model.generate
-#         **inputs,
-#         max_length=max_length,
-#         num_return_sequences=num_return_sequences,
-#         pad_token_id=tokenizer.eos_token_id
-#     )
-#     response = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
+instruction = """You are a creative assistant for eye care services. You must ONLY provide information directly related to eye health, vision, and eye care services. If the user's query is not related to eye care, respond with EXACTLY this message: 'I apologize, but I can only answer questions related to eye care. If you have any eye-related questions, I'd be happy to help. For more information, please contact 'RoseCity@gmail.com' """
+def generate_response(user_query, max_length=512, num_return_sequences=1):
+    prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
+    inputs = tokenizer(prompt, return_tensors="pt").to(base_model.device)
+    outputs =base_model.generate(
+        **inputs,
+        max_length=max_length,
+        num_return_sequences=num_return_sequences,
+        pad_token_id=tokenizer.eos_token_id
+    )
+    response = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
     
-#     # Extract only the response part
-#     response = response.split("Response:")[-1].strip()    
-#     return response
+    # Extract only the response part
+    response = response.split("Response:")[-1].strip()    
+    return response
 
 # Function to generate response using Hugging Face endpoint
-def generate_response(prompt, max_length=512, num_return_sequences=1):
-    api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"  
-    api_token = os.getenv("HUGGINGFACE_API_TOKEN")
-    return call_huggingface_endpoint(prompt, api_url, api_token)
+# def generate_response(prompt, max_length=512, num_return_sequences=1):
+#     api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"  
+#     api_token = os.getenv("HUGGINGFACE_API_TOKEN")
+#     return call_huggingface_endpoint(prompt, api_url, api_token)
 
 
 # Function to interactively handle the user query
