@@ -26,5 +26,5 @@ except KeyError as e:
 
 base_model.to(device)
 
-def get_model_and_tokenizer():
-    return base_model, tokenizer, device
+# def get_model_and_tokenizer():
+#     return base_model, tokenizer, device
