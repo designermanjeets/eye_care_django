@@ -29,6 +29,10 @@ from langchain.agents.output_parsers import ReActSingleInputOutputParser
 ###hugging_face_api_token = "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"
 ###HUGGINGFACEHUB_API_TOKEN = "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"
 
+#https://python.langchain.com/v0.1/docs/integrations/chat/huggingface/
+#https://python.langchain.com/v0.2/docs/how_to/#embedding-models
+#https://medium.com/@minekayaa/multi-agent-systems-langgraph-63c1abb3e242
+
 import os
 
 from langchain_community.llms import HuggingFaceTextGenInference
