@@ -5,50 +5,34 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-import openai
-from pydantic import BaseModel, Field
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from langchain.output_parsers import PydanticOutputParser
 from langchain.chat_models import ChatOpenAI
-from openai import OpenAI
 import time
-import random
 import json
 import requests
 from datetime import datetime, timedelta,date
 import re
 import uuid
-# from pages.model_loader import *
-# import torch
-# from transformers import AutoTokenizer, AutoModelForCausalLM
-# from peft import PeftModel
-
 from dotenv import load_dotenv
+from langchain.memory import ConversationBufferMemory
+import json
+import requests
+
 load_dotenv('.env.development')
-
-# Initialize the OpenAI client
-open_api_key = os.getenv("OPENAI_API_KEY")
-hugging_face_api_token = os.getenv("hugging_face_api_token")
-
-# open_api_key = ''
-# hugging_face_api_token = ""
-client = OpenAI(api_key=open_api_key)
-
-# Initialize the API credentials
+memory = ConversationBufferMemory()
 vendor_id = os.getenv("VendorId")
 vendor_password = os.getenv("VendorPassword")
 account_id = os.getenv("AccountId")
 account_password = os.getenv("AccountPassword")
-
-# Print the model structure for debugging
-def print_model_structure(model):
-    for name, module in model.named_modules():
-        print(name)
-print("Base model structure : ")
+hugging_face_api_token = os.getenv("hugging_face_api_token")
+# print(hugging_face_api_token,'hugging_face_api_token')
+api_url = "https://dgltkszlxd0qaoge.us-east-1.aws.endpoints.huggingface.cloud"
+headers = {
+    "Authorization": "Bearer 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",  
+    "Content-Type": "application/json"
+}
 
 # Define the function to call the Hugging Face endpoint
-def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_factor=0.3):
+def call_huggingface_endpoint(prompt, api_url, api_token,  max_new_tokens,  do_sample, temperature, top_p ,max_length=512,retries=1, backoff_factor=0.3):
     headers = {
         "Authorization": f"Bearer {api_token}",
         "Content-Type": "application/json"
@@ -56,8 +40,12 @@ def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_fac
     data = {
         "inputs": prompt,
         "parameters": {
-            "max_length": 512,
-            "num_return_sequences": 1,
+            "max_length":max_length,
+             "max_new_tokens":max_new_tokens,
+             "do_sample":do_sample,
+            "temperature":temperature,
+            "top_p":top_p,
+            
         }
     }
     for attempt in range(retries):
@@ -68,7 +56,6 @@ def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_fac
                 response=(response.json()[0]["generated_text"]).split('Response:')[1]
             except:
                 response=(response.json()[0]["generated_text"])
-            print("response----",response)
             return response
         except requests.exceptions.RequestException as e:
             if attempt < retries - 1:
@@ -78,111 +65,90 @@ def call_huggingface_endpoint(prompt, api_url, api_token, retries=3, backoff_fac
             else:
                 raise e
 
-# function for required date format in API
-def convert_date_format(date_str):
-    # Define date formats
-    formats = [
-        "%Y-%m-%d",        # ISO format
-        "%d-%m-%Y",        # European format
-        "%m-%d-%Y",        # US format
-        "%B %d, %Y",       # Full month name with day and year
-        "%b %d, %Y",       # Abbreviated month name with day and year
-        "%d %B %Y"         # Day with full month name and year
-    ]
-    # Remove ordinal suffixes (e.g., "st", "nd", "rd", "th")
-    date_str = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_str)
 
-    # Try parsing with each format
-    for fmt in formats:
-        try:
-            # Parse the date
-            parsed_date = datetime.strptime(date_str, fmt)
-            # Return in YYYY-MM-DD format
-            return parsed_date.strftime("%Y-%m-%d")
-        except ValueError:
-            continue
+# Function to convert datetime to desired formant for api call
+# def convert_date_format(date_str):
+#     # Define date formats
+#     formats = [
+#         "%Y-%m-%d",        # ISO format
+#         "%d-%m-%Y",        # European format
+#         "%m-%d-%Y",        # US format
+#         "%B %d, %Y",       # Full month name with day and year
+#         "%b %d, %Y",       # Abbreviated month name with day and year
+#         "%d %B %Y"         # Day with full month name and year
+#     ]
+#     # Remove ordinal suffixes (e.g., "st", "nd", "rd", "th")
+#     date_str = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_str)
 
-    # If no formats match, return the original string
-    return date_str
+#     # Try parsing with each format
+#     for fmt in formats:
+#         try:
+#             # Parse the date
+#             parsed_date = datetime.strptime(date_str, fmt)
+#             # Return in YYYY-MM-DD format
+#             return parsed_date.strftime("%Y-%m-%d")
+#         except ValueError:
+#             continue
 
-## function to fetch user info
-def fetch_info_openai(response):
-    prompt =(
-        f"Extract the following information from the text if available else give empty value:\n"
-        f"Text: {response}\n"
-        f"Extracted Information:\n"
-        f"FirstName:\n"
-        f"LastName:\n"
-        f"DateOfBirth:\n"
-        f"PhoneNumber:\n"
-        f"Email:\n"
-        f"Preferred date or time:\n"
+#     # If no formats match, return the original string
+#     return date_str
 
-    )
+# function to extract user info
+def fetch_info(response):
+    modelPromptForAppointment = f"""
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
 
+        Extract the following information from {response}: FirstName, LastName, DateOfBirth, Email, PhoneNumber and Preferred date or time  if available ,determine what could be the information <|eot_id|>
+        <|start_header_id|>user<|end_header_id|>
+        <|eot_id|><|start_header_id|>assistant<|end_header_id|>
+        """
     try:
-        completion = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-          {
-              "role": "user",
-              "content": prompt,
-          }
-          ]
-        )
-        # result = completion.choices[0].text.strip()
-        result = completion.choices[0].message.content.strip()
-
-        info = {}
+        result = call_huggingface_endpoint(modelPromptForAppointment, api_url, hugging_face_api_token,256 ,False  ,0.1 ,0.9)
+        result=result[len(modelPromptForAppointment):].strip()
+        data_dict = {}
         for line in result.split('\n'):
             if ':' in line:
-                key, value = line.split(':', 1)
-                info[key.strip()] = value.strip()
+                pattern = r"(\d+)\.\s*([a-zA-Z\s]+):\s*(.+)"
+                matches = re.findall(pattern, line)
+                if matches:
+                    key, value = matches[0][1].strip(), matches[0][2].strip()
+                    data_dict[key] = (value).replace('(not provided)','').replace('(Not provided)','')
 
-        return info
+        print(data_dict)
+        return data_dict
     except Exception as e:
         print(f"Error extracting information: {e}")
         return {}
 
-
 # Function to identify intent
 def identify_intent(user_query):
-    prompt=(
-        f"""Given the following user query: "{user_query}", identify the primary intent. The intent could be:
+    
+    model_prompt_for_intent = f"""
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        "Identify the primary intent of the following user query:n"
+        The intent must be one of the following options:
         - Greeting
         - Booking an appointment
         - Rescheduling an appointment
         - Canceling an appointment
         - Requesting static information (e.g., office hours, address)
         - Other inquiries
- 
-        For each intent:
-        - If it's a greeting, respond warmly like: "Hi there! How can I assist you today?"
-        - For booking, rescheduling, or canceling appointments, provide clear and helpful instructions.
-        - For static information requests also ask about insurance return result "static"
-        - For other inquiries, provide a friendly and helpful response.
-        and make sure that if query is regarding appointments it does not goes to static part
-        Avoid overly formal or robotic responses, and tailor the language to be more like a friendly human conversation.
-        and please note that do not return same text if you do not understand ask your queries
-    """)
+        Provide only the primary identified intent from the list above. Do not add anything extra..
+        <|eot_id|>
+        <|start_header_id|>user<|end_header_id|>
+        {user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
     retries = 3
     backoff_factor = 0.3
  
     for attempt in range(retries):
         try:
-            chat_completion = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    }
-                ]
-            )
-            # Extract the intent from the response
-            intent = chat_completion.choices[0].message.content.strip()
-            print("intent",intent)
+            
+            intent = call_huggingface_endpoint(model_prompt_for_intent, api_url, hugging_face_api_token,256 ,False  ,0.1 ,0.9)
+            
+            intent = intent[len(model_prompt_for_intent):].strip().split('\n')[0]  # Extract only the first line of the output
+            print("Intent2222:", intent,'222222')
             return intent
+            # return intent
         except requests.exceptions.RequestException as e:
             if attempt < retries - 1:
                 sleep_time = backoff_factor * (2 ** attempt)
@@ -195,29 +161,31 @@ def identify_intent(user_query):
             print(f"An unexpected error occurred: {e}")
             return "Error: An unexpected error occurred while identifying intent."
 
-
 # funtion to find intent for practice/custom questions
 def identify_intent_practice_question(user_query,data):
-    prompt = (
-    f"""Analyze the following user query: "{user_query}".
-    Determine the intent of the query. If the query requests information that is available in the provided {data}, respond with the appropriate information from the data.
-    If the query does not match any available information, respond with "Please provide valid information."
-    If the query does not fit any of these categories, respond with "I'm sorry, I can't provide that information. Can you ask about something else related to our services or appointments?"
-    and please note that donot return same text if you donot understand ask your queries.
-    Avoid formal language; aim for a friendly and human-like tone."""
+
+    print('identify_intent_practice_question')
+    print("--",data,"-static data-")
+    model_prompt_for_static_queries = (
+    f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        Data available for reference: {data}
+        Instructions:
+        1. Analyze the user's query to determine its intent.
+        2. If the query requests information that is available in the provided data, respond with the relevant information from the data.
+        3. If the query does not match any information available, respond with "Please provide valid information."
+        4. If the query does not fit into the above categories, respond with "I'm sorry, I can't provide that information. Can you ask about something else related to our services or appointments?"
+        5. If you don't understand the query, ask for clarification rather than returning the same text.
+        please follow the above instructions carefully.
+        Avoid formal language; aim for a friendly and human-like tone.
+        <|eot_id|>
+        <|start_header_id|>user<|end_header_id|>
+        {user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    """
     )
-    chat_completion = client.chat.completions.create(
-      model="gpt-3.5-turbo",
-      messages=[
-         
-          {
-              "role": "user",
-              "content": prompt,
-          }
-      ]
-    )
-    intent = chat_completion.choices[0].message.content.strip()
-    return intent
+        
+    response = call_huggingface_endpoint(model_prompt_for_static_queries, api_url, hugging_face_api_token,150 ,True  ,0.6 ,0.9)
+    response=response[len(model_prompt_for_static_queries):].strip()
+    return response
 
 # funtion for edit user info
 def edit_msg(request):
@@ -225,7 +193,7 @@ def edit_msg(request):
     session_id = data.get('session_id', '')
     user_response=''
     fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
- 
+    
     try:
         request.session[f'edit_msg{session_id}']
     except:
@@ -235,190 +203,140 @@ def edit_msg(request):
         # Extract the current context from the session
         current_context = request.session.get('context', '{}')   
         # Convert context from JSON string to dictionary if necessary
-        if isinstance(current_context, str):
-            try:
-                current_context = json.loads(current_context)
-            except json.JSONDecodeError:
-                current_context = {}  # Default to an empty dictionary if JSON is invalid
-   
+        
         # List of all possible fields
         fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
    
         # Ask which fields the user wants to edit
-        prompt = "Which of the following fields would you like to edit? " + ", ".join(fields) + ". Please list them."
+        prompt = "Which of the following fields would you like to edit? " + ", ".join(fields) 
         user_response = transform_input(prompt)
         return user_response
     else:
+
         edit_msg=request.session[f'edit_msg{session_id}']
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         context=request.session[f'context{session_id}']
-        print("user_response",user_response)
-        prompt = (
-        f"""this is my old context{context} and i want to update this context {edit_msg} using this infomation"""
-           
-        )
-        chat_completion = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ]
-        )
-        context = chat_completion.choices[0].message.content.strip()
+        print("gjhgjhgjhgjhgjhgjhgjhvb ",edit_msg)
+        
+        response_content_prompt = f"""
+                <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+                "This is my current information: {context}\n"
+
+                Instructions:
+                - If the user specifies which information to change, provide the updated context with those changes applied only and return the full context donot delete anything.
+                - If the user want to change information but does not specify any changes, respond with only word "no" doesnot ask  question. for example user ask i want to change
+                - If the user does not want to change anything, respond with "yes"
+                - if user want to say want to changes but mention field name and doensot give what to change then respond with only word "no" doesnot ask  question.
+                please note that donot remove numerical values at end of context.
+                please follow the above instructions carefully.
+                <|eot_id|>
+                <|start_header_id|>user<|end_header_id|>
+                {edit_msg}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+                """
+        response_content = call_huggingface_endpoint(response_content_prompt, api_url, hugging_face_api_token,256 ,False  ,0.09 ,0.9)
+        response_content = response_content[len(response_content_prompt):].strip()
+        print(response_content,"sdfhuh")
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
-        request.session[f'context{session_id}']=context
+        request.session[f'context{session_id}']=response_content
         del request.session[f'edit_msg{session_id}']
         del request.session[f'confirmation{session_id}']
-        return handle_user_query_postprocess(request,context)
+        del request.session[f'fields{session_id}']
+        
+        return handle_user_query_postprocess(request,response_content)
 
-
-def conf_intent(request):
+# funtion to edit user context 
+def confirmation_intent(request):
     data = json.loads(request.body.decode('utf-8'))
     session_id = data.get('session_id', '')
-    
-    # Retrieve current appointment details from the session
-    context = request.session.get(f'context{session_id}', '')
-    print("Current context:", context)
-    msg = request.session.get(f'confirmation{session_id}', '')
-    print("User's response:", msg)
-    
-    # Replace the old message with a space in the context
-    context = context.replace(msg.strip(), " ")
-    print("Updated context after replacement:", context)
-
-    # User's response and context prompt
-    prompt = f"""
-    You have the following appointment details:
-    {context}
-
-    The user responded: '{msg}'
-
-    Based on the user's response, provide the output as follows:
-
-    1. **If the user wants to update their details :**
-    this is my old context {context} and I want to update this using the user's response: {msg}
-    -respond with updated context
-
-    2. **If the user confirms the details are correct:**
-        - Respond with only the word 'yes'.
-
-    3. **If the user indicates they want to change something but does not specify what:**
-        - Respond with only the word 'no'.
-
-    Be concise and provide only the necessary response based on the instructions above.and for yes or no provide only yes or no.
-    """
-
-    chat_completion = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-    )
-
-    response_content = chat_completion.choices[0].message.content.strip()
-    print("AI response:", response_content)
-    
-    # Update session based on response
+    context = request.session[f'context{session_id}']
+    user_input = request.session.get(f'confirmation{session_id}', '')
+    request.session[f'context{session_id}']=context.replace(user_input,'')
+    context = request.session[f'context{session_id}']
+    response_content_prompt = f"""
+                <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+                "This is my current information: {context}\n"
+                Instructions:
+                - If the user specifies which information to change, provide the updated context with those changes applied only and return the full context donot delete anything.
+                - If the user want to change information but does not specify any changes, respond with only word "no" doesnot ask  question. for example user ask i want to change
+                - If the user does not want to change anything, respond with "yes"
+                - if user want to say want to changes but mention field name and doensot give what to change then respond with only word "no" doesnot ask  question.
+                please note that donot remove numerical values at end of context.
+                please follow the above instructions carefully.
+                <|eot_id|>
+                <|start_header_id|>user<|end_header_id|>
+                {user_input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+                """
+    response_content = call_huggingface_endpoint(response_content_prompt, api_url, hugging_face_api_token,256 ,False  ,0.09 ,0.9)
+    response_content = response_content[len(response_content_prompt):].strip()
     if response_content == 'yes':
         request.session[f'confirmation{session_id}'] = 'yes'
-        
     elif response_content == 'no':
         request.session[f'confirmation{session_id}'] = 'no'
-        
     else:
         request.session[f'confirmation{session_id}'] = 'True'
         request.session[f'context{session_id}'] = response_content
-        print("New context:", response_content)
-        
-    print("Final context in session:", request.session.get(f'context{session_id}', ''))
-
+        del request.session[f'fields{session_id}']
+    
     return handle_user_query_postprocess(request, response_content)
 
-# function for preferred time appointment
-def date_time_format(date_time):
-    date_pattern = r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b'
- 
-    prompt = f"Convert the date and time in this format {date_pattern}: '{date_time}'"
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-             {
-                 "role": "user",  
-              "content": prompt
-              }
-        ],
-        max_tokens=60,
-        temperature=0.9
-    )
-   
-    transformed_text = response.choices[0].message['content']
-    return transformed_text
+# funtion to transform greeting response
 
-# funtion for data validation check
-def validation_check(user_query):
-    prompt = (
-        f"""Identify the user input: "{user_query}".
-        its related to user repose its validate the data is correct or not correct  if correct and return True and if not correct then return False"""
-    )
-    chat_completion = client.chat.completions.create(
-      model="gpt-3.5-turbo",
-      messages=[
-          {
-              "role": "user",
-              "content": prompt,
-          }
-      ]
-    )
-    # Extract the intent from the response
-    intent = chat_completion.choices[0].message.content.strip()
-    return intent
+def transform_input_greeting(user_input):
+
+    # Construct a prompt to rephrase the user input
+    modelPromptForAppointment = f"""
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+
+            You are a helpful Eyecare assistant for MaximCaye Care. Start with a simple greeting and assist the user related to appointment and Do not anything from your end.<|eot_id|><|start_header_id|>user<|end_header_id|>
+
+            {user_input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    """
+
+    # Query the model
+    response=call_huggingface_endpoint(modelPromptForAppointment, api_url, hugging_face_api_token,256 ,False  ,0.9 ,0.9)
+    # response = query_llama3(modelPromptForAppointment)
+    response = response[len(modelPromptForAppointment):].strip()
+
+    return response
 
 # function for transforming the responses
+def format_appointment_date(date):
+    model_prompt_for_appointment = f"""
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        Instructions:
+        change the date in this format:"%m/%d/%Y" or  "month/day/year"
+        please provide only response
+        <|eot_id|>
+        <|start_header_id|>user<|end_header_id|>
+        {date}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+        """
+    response = call_huggingface_endpoint(model_prompt_for_appointment, api_url, hugging_face_api_token,256 ,False  ,0.9 ,0.9)
+    response_content = response[len(model_prompt_for_appointment):].strip()
+    return response_content
+
 def transform_input(input_text):
     # Define a list of prompts to transform the input text
-    prompts = [
-
-        f"Rephrase the following request in a more engaging way related to appointment do not use brackets : '{input_text}'",
-        f"How would you ask this question in a friendly and conversational tone related to appointment do not use brackets :  '{input_text}'?",
-        f"How would you ask this question in a friendly and conversational tone related to appintment and shoud be ques not like ask ques on bracket: '{input_text}'?",
-        f"Make this request sound more personable and interesting related to appointment do not use brackets : '{input_text}'",
-        f"Convert this question into a warm and inviting request related to appointment do not use brackets : '{input_text}'",
-        f"Turn the following statement into a casual and friendly question related to appointment do not use brackets : '{input_text}'"
-
-    ]
-
-    # Select a random prompt from the list
-    prompt = random.choice(prompts)
-
+    modelPromptTotransform = f"""
+        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+        how would you ask this {input_text} as a question in a friendly and conversational tone related to appointment? please provide only one option
+        user
+        <|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    """
+     
     # Call the API using the latest method
-    response = client.chat.completions.create(
-
-        model="gpt-3.5-turbo",
-
-        messages=[
-
-            {"role": "system", "content": "You are a creative apointment booking assistant .Start Chat with Greetings.\n not add too much words simple greeting and assist"},
-
-            {"role": "user", "content": prompt}
-
-        ],
-
-        max_tokens=60,
-        temperature=0.9
-
-    )
-    # Extract the response text
-    transformed_text = response.choices[0].message.content.strip()
-    return transformed_text
+    response = call_huggingface_endpoint(modelPromptTotransform, api_url, hugging_face_api_token,256 ,False  ,0.9 ,0.9)
+    # response = query_llama3(modelPromptTotransform)
+    # print(response,'transformed response-----')
+    response = response[len(modelPromptTotransform):].strip()
+    print(response,'transformed response-----')
+    return response
 
 # funtion to update user info
 def update_info(extracted_info, additional_info):
     for key, value in additional_info.items():
-        if value and value.lower() != "none":
+        if (value and value.lower() != "none")or(value and value.lower() !=  'Not available'):
             extracted_info[key] = value
 
 # Tool to get authentication token
@@ -444,355 +362,211 @@ def get_auth_token(vendor_id, vendor_password, account_id, account_password) -> 
     except json.JSONDecodeError:
         return "Failed to decode JSON response"
 
-# extracting day as per prefered time for appointment
-def prefred_date_time_fun1(response):
-  if "next" in response.lower() or "comming" in response.lower() or "upcomming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
-        def get_next_weekday(day_name, use_next=False):
-            # Dictionary to convert day names to weekday numbers
-            days_of_week = {
-                'monday': 0,
-                'tuesday': 1,
-                'wednesday': 2,
-                'thursday': 3,
-                'friday': 4,
-                'saturday': 5,
-                'sunday': 6
-            }
-
-            # Get today's date and the current weekday
-            today = datetime.now()
-            current_weekday = today.weekday()
-
-            # Convert the day name to a weekday number
-            target_weekday = days_of_week[day_name.lower()]
-
-            # Calculate the number of days until the next target weekday
-            days_until_target = (target_weekday - current_weekday + 7) % 7
-            if days_until_target == 0 or use_next:
-                days_until_target += 7
-
-            # Calculate the date for the next target weekday
-            next_weekday = today + timedelta(days=days_until_target)
-            return next_weekday
-
-        def get_relative_day(keyword):
-            today = datetime.now()
-            if keyword == "tomorrow":
-                return today + timedelta(days=1)
-            elif keyword == "day after tomorrow":
-                return today + timedelta(days=2)
-            return None
-
-        keywords = ["next", "coming", "upcoming", "tomorrow", "day after tomorrow"]
-        use_next = any(keyword in response for keyword in ["next", "coming", "upcoming"])
-
-        # Check for "tomorrow" and "day after tomorrow"
-        relative_day = None
-        for keyword in ["tomorrow", "day after tomorrow"]:
-            if keyword in response:
-                relative_day = get_relative_day(keyword)
-                response = response.replace(keyword, "").strip()
-                break
-
-        if relative_day:
-            if response:
-                # If there's a specific day mentioned, calculate from the relative day
-                next_day = get_next_weekday(response)
-                if next_day <= relative_day:
-                    next_day += timedelta(days=7)
-                return (next_day.strftime("%Y-%m-%dT%H:%M:%S"))
-            else:
-                return (relative_day.strftime("%Y-%m-%dT%H:%M:%S"))
-        else:
-            # Remove the keyword from the input if it exists
-            for keyword in ["next", "coming", "upcoming"]:
-                response = response.replace(keyword, "").strip()
-
-            # Get the next occurrence of the specified day
-            next_day = get_next_weekday(response, use_next)
-            return next_day.strftime("%Y-%m-%dT%H:%M:%S")
-
-
-  else:
-    date_pattern = r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4}), (Morning|Afternoon|Evening|Night)\b'
-    # Search for the pattern in the text
-    
-    try:
-      match = re.search(date_pattern, response)
-      month, day, year, time_of_day = match.groups()
-      date_str = f"{month} {day}, {year}"
-
-      # Convert month_day_year to a datetime object
-      datetime_obj = datetime.strptime(date_str, '%B %d, %Y')
-
-      # Define time mappings
-      time_mappings = {"Morning": 10,
-                       "Afternoon": 15,
-                       "Evening": 18,
-                       "Night": 21}
-
-      # Add the appropriate hour to the datetime object
-      hour = time_mappings.get(time_of_day, 12)  # Default to noon if not found
-      datetime_obj = datetime_obj.replace(hour=hour)
-
-      # Convert to the target datetime
-      target_datetime = datetime(2024, 7, 21, 8, 0, 0)
-
-      # Print the results in ISO 8601 format
-      print(f"Extracted datetime: {datetime_obj.isoformat()}")
-      print(f"Target datetime: {target_datetime.isoformat()}")
-      return datetime_obj.isoformat()
-
-    except AttributeError:
-      date_pattern = r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}), (\d{4})\b'
-      time_pattern = r'\b(\d{1,2}) (AM|PM)\b'
-      period_pattern = r'\b(Morning|Afternoon|Evening|Night)\b'
-
-      # Search for the date
-      date_match = re.search(date_pattern, response)
-      # Search for the time
-      time_match = re.search(time_pattern, response)
-      # Search for the period
-      period_match = re.search(period_pattern, response)
-
-      if date_match:
-          month, day, year = date_match.groups()
-          date_str = f"{month} {day}, {year}"
-
-          # Convert month_day_year to a datetime object
-          datetime_obj = datetime.strptime(date_str, '%B %d, %Y')
-
-          if time_match:
-              hour, am_pm = time_match.groups()
-              hour = int(hour)
-              if am_pm == 'PM' and hour != 12:
-                  hour += 12
-              elif am_pm == 'AM' and hour == 12:
-                  hour = 0
-
-              datetime_obj = datetime_obj.replace(hour=hour)
-          else:
-              # Define time mappings if no explicit time is provided
-              time_mappings = {
-                  "Morning": 9,
-                  "Afternoon": 15,
-                  "Evening": 18,
-                  "Night": 21}
-
-              if period_match:
-                  period = period_match.group(0)
-                  hour = time_mappings.get(period, 12)  # Default to noon if not found
-                  datetime_obj = datetime_obj.replace(hour=hour)
-
-          return datetime_obj.isoformat()
-      else: 
-        return None
-
 # Funtion for date format as per API requirement
-def format_appointment_date(from_date):
-    parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
-    return parsed_date.strftime("%m/%d/%Y")
+# def format_appointment_date(from_date):
+#     parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
+#     return parsed_date.strftime("%m/%d/%Y")
 
 # extracting day as per prefered date for appointment
-def prefred_date_time_fun(response):
-    print("response12",response)
-    def get_next_weekday(day_name, use_next=False):
-    # Dictionary to convert day names to weekday numbers
-        days_of_week = {
-            'monday': 0, 'mon': 0, 'Monday': 0, 'Mon': 0,
-            'tuesday': 1, 'tues': 1,'Tuesday': 1, 'Tues': 1,
-            'wednesday': 2, 'wed': 2,'Wednesday': 2, 'Wed': 2,
-            'thursday': 3, 'thurs': 3,'Thursday': 3, 'Thurs': 3,
-            'friday': 4, 'fri': 4,'Friday':4, 'Fri':4,
-            'saturday': 5, 'sat': 5,'Saturday': 5, 'Sat': 5,
-            'sunday': 6, 'sun': 6,'Sunday': 6, 'Sun': 6
-        }
+# def prefred_date_time_fun(response):
+#     print("response12",response)
+#     def get_next_weekday(day_name, use_next=False):
+#     # Dictionary to convert day names to weekday numbers
+#         days_of_week = {
+#             'monday': 0, 'mon': 0, 'Monday': 0, 'Mon': 0,
+#             'tuesday': 1, 'tues': 1,'Tuesday': 1, 'Tues': 1,
+#             'wednesday': 2, 'wed': 2,'Wednesday': 2, 'Wed': 2,
+#             'thursday': 3, 'thurs': 3,'Thursday': 3, 'Thurs': 3,
+#             'friday': 4, 'fri': 4,'Friday':4, 'Fri':4,
+#             'saturday': 5, 'sat': 5,'Saturday': 5, 'Sat': 5,
+#             'sunday': 6, 'sun': 6,'Sunday': 6, 'Sun': 6
+#         }
 
-        # Get today's date and the current weekday
-        today = datetime.now()
-        current_weekday = today.weekday()
+#         # Get today's date and the current weekday
+#         today = datetime.now()
+#         current_weekday = today.weekday()
 
-        # Convert the day name to a weekday number
-        target_weekday = days_of_week[day_name.lower()]
+#         # Convert the day name to a weekday number
+#         target_weekday = days_of_week[day_name.lower()]
 
-        # Calculate the number of days until the next target weekday
-        days_until_target = (target_weekday - current_weekday + 7) % 7
+#         # Calculate the number of days until the next target weekday
+#         days_until_target = (target_weekday - current_weekday + 7) % 7
 
-        if days_until_target == 0 or use_next:
-            days_until_target += 7
+#         if days_until_target == 0 or use_next:
+#             days_until_target += 7
 
-        # Calculate the date for the next target weekday
-        next_weekday = today + timedelta(days=days_until_target)
-        return next_weekday
+#         # Calculate the date for the next target weekday
+#         next_weekday = today + timedelta(days=days_until_target)
+#         return next_weekday
 
-    def get_upcoming_weekday(day_name):
-        # Dictionary to convert day names to weekday numbers
-        days_of_week = {
-            'monday': 0, 'mon': 0, 'Monday': 0, 'Mon': 0,
-            'tuesday': 1, 'tues': 1,'Tuesday': 1, 'Tues': 1,
-            'wednesday': 2, 'wed': 2,'Wednesday': 2, 'Wed': 2,
-            'thursday': 3, 'thurs': 3,'Thursday': 3, 'Thurs': 3,
-            'friday': 4, 'fri': 4,'Friday':4, 'Fri':4,
-            'saturday': 5, 'sat': 5,'Saturday': 5, 'Sat': 5,
-            'sunday': 6, 'sun': 6,'Sunday': 6, 'Sun': 6
-        }
-        # Get today's date and the current weekday
-        today = datetime.now()
-        current_weekday = today.weekday()
+#     def get_upcoming_weekday(day_name):
+#         # Dictionary to convert day names to weekday numbers
+#         days_of_week = {
+#             'monday': 0, 'mon': 0, 'Monday': 0, 'Mon': 0,
+#             'tuesday': 1, 'tues': 1,'Tuesday': 1, 'Tues': 1,
+#             'wednesday': 2, 'wed': 2,'Wednesday': 2, 'Wed': 2,
+#             'thursday': 3, 'thurs': 3,'Thursday': 3, 'Thurs': 3,
+#             'friday': 4, 'fri': 4,'Friday':4, 'Fri':4,
+#             'saturday': 5, 'sat': 5,'Saturday': 5, 'Sat': 5,
+#             'sunday': 6, 'sun': 6,'Sunday': 6, 'Sun': 6
+#         }
+#         # Get today's date and the current weekday
+#         today = datetime.now()
+#         current_weekday = today.weekday()
 
-        # Convert the day name to a weekday number
-        target_weekday = days_of_week[day_name.lower()]
+#         # Convert the day name to a weekday number
+#         target_weekday = days_of_week[day_name.lower()]
 
-        # Calculate the number of days until the upcoming target weekday
-        days_until_target = (target_weekday - current_weekday + 7) % 7
+#         # Calculate the number of days until the upcoming target weekday
+#         days_until_target = (target_weekday - current_weekday + 7) % 7
 
-        # If the day is today and has not passed, use today's date
-        if days_until_target == 0:
-            next_weekday = today
-        else:
-            next_weekday = today + timedelta(days=days_until_target)
+#         # If the day is today and has not passed, use today's date
+#         if days_until_target == 0:
+#             next_weekday = today
+#         else:
+#             next_weekday = today + timedelta(days=days_until_target)
             
-        return next_weekday
+#         return next_weekday
 
-    def get_relative_day(keyword):
-        today = datetime.now()
-        if keyword == "tomorrow":
-            return today + timedelta(days=1)
-        elif keyword == "day after tomorrow":
-            return today + timedelta(days=2)
-        return None
+#     def get_relative_day(keyword):
+#         today = datetime.now()
+#         if keyword == "tomorrow":
+#             return today + timedelta(days=1)
+#         elif keyword == "day after tomorrow":
+#             return today + timedelta(days=2)
+#         return None
 
-    def extract_date_from_response(response):
-        keywords = ["next", "coming", "upcoming", "tomorrow", "day after tomorrow"]
-        use_next = any(keyword in response.lower() for keyword in ["next", "coming"])
-        use_upcoming = "upcoming" in response.lower()
+#     def extract_date_from_response(response):
+#         keywords = ["next", "coming", "upcoming", "tomorrow", "day after tomorrow"]
+#         use_next = any(keyword in response.lower() for keyword in ["next", "coming"])
+#         use_upcoming = "upcoming" in response.lower()
 
-        # Check for "tomorrow" and "day after tomorrow"
-        relative_day = None
-        for keyword in ["tomorrow", "day after tomorrow"]:
-            if keyword in response.lower():
-                relative_day = get_relative_day(keyword)
-                response = re.sub(keyword, "", response, flags=re.IGNORECASE).strip()
-                break
+#         # Check for "tomorrow" and "day after tomorrow"
+#         relative_day = None
+#         for keyword in ["tomorrow", "day after tomorrow"]:
+#             if keyword in response.lower():
+#                 relative_day = get_relative_day(keyword)
+#                 response = re.sub(keyword, "", response, flags=re.IGNORECASE).strip()
+#                 break
 
-        # Extract the day name from the response
-        day_name_match = re.search(r'\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tues|Wed|Thurs|Fri|Sat|Sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues|wed|thurs|fri|sat|sun)\b', response, re.IGNORECASE)
-        if day_name_match:
-            day_name = day_name_match.group(0)
-        else:
-            day_name = None
+#         # Extract the day name from the response
+#         day_name_match = re.search(r'\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tues|Wed|Thurs|Fri|Sat|Sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues|wed|thurs|fri|sat|sun)\b', response, re.IGNORECASE)
+#         if day_name_match:
+#             day_name = day_name_match.group(0)
+#         else:
+#             day_name = None
 
-        if relative_day:
-            if day_name:
-                # If there's a specific day mentioned, calculate from the relative day
-                next_day = get_next_weekday(day_name)
-                if next_day <= relative_day:
-                    next_day += timedelta(days=7)
-                if next_day < datetime.now():
-                    return "Date is in the past"
-                return next_day.strftime("%Y-%m-%dT%H:%M:%S")
-            else:
-                return relative_day.strftime("%Y-%m-%dT%H:%M:%S")
-        else:
-            # Remove the keyword from the input if it exists
-            for keyword in ["next", "coming", "upcoming"]:
-                response = re.sub(keyword, "", response, flags=re.IGNORECASE).strip()
+#         if relative_day:
+#             if day_name:
+#                 # If there's a specific day mentioned, calculate from the relative day
+#                 next_day = get_next_weekday(day_name)
+#                 if next_day <= relative_day:
+#                     next_day += timedelta(days=7)
+#                 if next_day < datetime.now():
+#                     return "Date is in the past"
+#                 return next_day.strftime("%Y-%m-%dT%H:%M:%S")
+#             else:
+#                 return relative_day.strftime("%Y-%m-%dT%H:%M:%S")
+#         else:
+#             # Remove the keyword from the input if it exists
+#             for keyword in ["next", "coming", "upcoming"]:
+#                 response = re.sub(keyword, "", response, flags=re.IGNORECASE).strip()
 
-            if day_name:
-                if use_upcoming:
-                    next_day = get_upcoming_weekday(day_name)
-                else:
-                    next_day = get_next_weekday(day_name, use_next)
-                if next_day < datetime.now():
-                    return "Date is in the past"
-                return next_day.strftime("%Y-%m-%dT%H:%M:%S")
-            else:
-                return "No valid day found in the response"
-    if "next" in response.lower() or "coming" in response.lower() or "upcoming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
+#             if day_name:
+#                 if use_upcoming:
+#                     next_day = get_upcoming_weekday(day_name)
+#                 else:
+#                     next_day = get_next_weekday(day_name, use_next)
+#                 if next_day < datetime.now():
+#                     return "Date is in the past"
+#                 return next_day.strftime("%Y-%m-%dT%H:%M:%S")
+#             else:
+#                 return "No valid day found in the response"
+#     if "next" in response.lower() or "coming" in response.lower() or "upcoming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
         
-        return extract_date_from_response(response)
+#         return extract_date_from_response(response)
 
-    else:
-        response=response.replace(',','')
-        patterns = [
-            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
-            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
-            (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
-            (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4})\b', '%d %B %Y'),
-            (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (\d{4})\b','%B %d %Y'), # Added this line
-            (r'\b(\d{1,2}) (AM|PM)\b', None),
-            (r'\b(Morning|Afternoon|Evening|Night)\b', None),
-            (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m/%d/%Y'),
-            (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m-%d-%Y'),
-            (r'\b(0[1-9]|[12][0-9]|3[01])(\/|-)(0[1-9]|1[0-2])(\/|-)(19|20)\d{2}\b', '%d/%m/%Y'),
-            (r'\b(0[1-9]|[12][0-9]|3[01])(\/|-)(0[1-9]|1[0-2])(\/|-)(19|20)\d{2}\b', '%d-%m-%Y'),
-            (r'\b(\d{4})-(\d{2})-(\d{1,2})\b', '%Y-%m-%d'),
-            (r'\b(\d{2})/(\d{1,2})/(\d{4})\b', '%m/%d/%Y'),
-            (r'\b(\d{4})/(\d{2})/(\d{1,2})\b', '%Y/%m/%d'),
-            (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d, %Y'),
-            (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d %Y'),
-            (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4})\b', '%b %d, %Y'),
-            (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4})\b', '%b %d %Y'),
-            (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %b %Y'),
-            (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4})\b', '%d %b %Y'),
-    ]
+#     else:
+#         response=response.replace(',','')
+#         patterns = [
+#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
+#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
+#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
+#             (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
+#             (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4})\b', '%d %B %Y'),
+#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (\d{4})\b','%B %d %Y'), # Added this line
+#             (r'\b(\d{1,2}) (AM|PM)\b', None),
+#             (r'\b(Morning|Afternoon|Evening|Night)\b', None),
+#             (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m/%d/%Y'),
+#             (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m-%d-%Y'),
+#             (r'\b(0[1-9]|[12][0-9]|3[01])(\/|-)(0[1-9]|1[0-2])(\/|-)(19|20)\d{2}\b', '%d/%m/%Y'),
+#             (r'\b(0[1-9]|[12][0-9]|3[01])(\/|-)(0[1-9]|1[0-2])(\/|-)(19|20)\d{2}\b', '%d-%m-%Y'),
+#             (r'\b(\d{4})-(\d{2})-(\d{1,2})\b', '%Y-%m-%d'),
+#             (r'\b(\d{2})/(\d{1,2})/(\d{4})\b', '%m/%d/%Y'),
+#             (r'\b(\d{4})/(\d{2})/(\d{1,2})\b', '%Y/%m/%d'),
+#             (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d, %Y'),
+#             (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d %Y'),
+#             (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4})\b', '%b %d, %Y'),
+#             (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4})\b', '%b %d %Y'),
+#             (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %b %Y'),
+#             (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4})\b', '%d %b %Y'),
+#     ]
         
-        # Time mappings for periods of the day
-        time_mappings = {
-            "Morning": 9,
-            "Afternoon": 15,
-            "Evening": 18,
-            "Night": 21
-        }
+#         # Time mappings for periods of the day
+#         time_mappings = {
+#             "Morning": 9,
+#             "Afternoon": 15,
+#             "Evening": 18,
+#             "Night": 21
+#         }
     
-        datetime_obj = None    
-        for pattern, date_format in patterns:
-            match = re.search(pattern, response)
+#         datetime_obj = None    
+#         for pattern, date_format in patterns:
+#             match = re.search(pattern, response)
             
-            if match:
-                groups = match.groups()
-                if date_format:
+#             if match:
+#                 groups = match.groups()
+#                 if date_format:
                     
-                    date_str = ' '.join(groups[:3])
+#                     date_str = ' '.join(groups[:3])
                     
-                    datetime_obj = datetime.strptime(date_str, date_format)
-                    if len(groups) == 4:  # If there's a time of day
-                        period = groups[3]
-                        hour = time_mappings.get(period, 12)
-                        datetime_obj = datetime_obj.replace(hour=hour)
-                        if datetime_obj < datetime.now():
-                            return "Date is in the past"
-                    break
-                else:
-                    if len(groups) == 2 and groups[1] in ["AM", "PM"]:
-                        hour, am_pm = groups
-                        hour = int(hour)
-                        if am_pm == 'PM' and hour != 12:
-                            hour += 12
-                        elif am_pm == 'AM' and hour == 12:
-                            hour = 0
-                        if datetime_obj:
-                            datetime_obj = datetime_obj.replace(hour=hour)
-                        else:
-                            datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
+#                     datetime_obj = datetime.strptime(date_str, date_format)
+#                     if len(groups) == 4:  # If there's a time of day
+#                         period = groups[3]
+#                         hour = time_mappings.get(period, 12)
+#                         datetime_obj = datetime_obj.replace(hour=hour)
+#                         if datetime_obj < datetime.now():
+#                             return "Date is in the past"
+#                     break
+#                 else:
+#                     if len(groups) == 2 and groups[1] in ["AM", "PM"]:
+#                         hour, am_pm = groups
+#                         hour = int(hour)
+#                         if am_pm == 'PM' and hour != 12:
+#                             hour += 12
+#                         elif am_pm == 'AM' and hour == 12:
+#                             hour = 0
+#                         if datetime_obj:
+#                             datetime_obj = datetime_obj.replace(hour=hour)
+#                         else:
+#                             datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
     
-                    elif len(groups) == 1 and groups[0] in time_mappings:
-                        period = groups[0]
-                        hour = time_mappings[period]
-                        if datetime_obj:
-                            datetime_obj = datetime_obj.replace(hour=hour)
-                        else:
-                            datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)    
-                break
+#                     elif len(groups) == 1 and groups[0] in time_mappings:
+#                         period = groups[0]
+#                         hour = time_mappings[period]
+#                         if datetime_obj:
+#                             datetime_obj = datetime_obj.replace(hour=hour)
+#                         else:
+#                             datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)    
+#                 break
     
-        if not datetime_obj:
-            raise ValueError("No valid date format found in the response")
+#         if not datetime_obj:
+#             raise ValueError("No valid date format found in the response")
     
-        return datetime_obj.isoformat()
+#         return datetime_obj.isoformat()
 
 # Tool to book appointment
 def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber, Email, prefred_date_time):
@@ -831,7 +605,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     session_id = data.get('session_id', '')    
     if request.session[f'book_appointment{session_id}'] == 'True':
 
-        result = f"Choose a location by entering the ID: {result}"
+        result = f" Choose a location by entering the ID : {result}"
         return result
     if str(request.session[f'book_appointment{session_id}']) in valid_ids:
         location_id = request.session[f'book_appointment{session_id}']
@@ -921,7 +695,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
  
     # Step 4: Get the open slots for the selected location, provider, and reason
     print(prefred_date_time,'prefred_date_time -----------------')
-    preferred = prefred_date_time_fun(prefred_date_time)
+    preferred = format_appointment_date(prefred_date_time)
     print(type(preferred),'=========',preferred)
     if 'Date is in the past' in preferred:
         data = json.loads(request.body.decode('utf-8'))
@@ -932,16 +706,8 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
             "{message}"
             Please remove the placeholder `{prefred_date_time}` and return the updated text without changing anything else."""   
         )
-        chat_completion = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ]
-        )
-        message = chat_completion.choices[0].message.content.strip()
+        chat_completion = call_huggingface_endpoint(prompt, api_url, hugging_face_api_token,256 ,True  ,0.5 ,0.9)
+        message = chat_completion
         request.session[f'context{session_id}']=message
         print(message,'====================+')
         return 'Please provide a valid date time for Appointment'
@@ -981,88 +747,9 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         request.session[f'slot_id{session_id}'] = 'True'
         return f"""Invalid slot ID. 
                 choose a valid slot by entering the ID. {result} """
- 
+    
     # Step 5: Confirm details with the user   
-    confirmation_message = (
-        f"Here are the details of your appointment:\n"
-        f"Location ID: {location_id}\n"
-        f"Provider ID: {provider_id}\n"
-        f"Reason ID: {reason_id}\n"
-        f"Preferred Slot ID: {open_slot_id}\n"
-        f"Date and Time: {from_date}\n"
-        f"Name: {FirstName} {LastName}\n"
-        f"DOB: {DOB}\n"
-        f"Phone: {PhoneNumber}\n"
-        f"Email: {Email}\n"
-        f"Is this information correct? (yes/no)"
-    )
-    try:
-        print(request.session[f'confirmation{session_id}'],'======================')
-    except:
-        request.session[f'confirmation{session_id}'] = 'True'
-    
-    if request.session[f'confirmation{session_id}'] == "True":
-        return confirmation_message
-    
-    # Step 6: If user confirms, send OTP. Only after user confirms, proceed with OTP
-    if request.session[f'confirmation{session_id}'] == 'yes':
-        send_otp_url = "https://iochatbot.maximeyes.com/api/common/sendotp"
-        otp_payload = {
-            "FirstName": FirstName,
-            "LastName": LastName,
-            "DOB": DOB,
-            "PhoneNumber": PhoneNumber,
-            "Email": Email
-        }
-        try:
-            otp_response = requests.post(send_otp_url, json=otp_payload, headers=headers)
-            otp_response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred while sending OTP: {e}")
-            return
-        if otp_response.status_code != 200:
-            return f"Failed to send OTP. Status code: {otp_response.status_code}"
- 
-        try:
-            request.session[f'otp{session_id}']
-        except:
-            request.session[f'otp{session_id}'] = 'True'
-        result = ''
-        if request.session[f'otp{session_id}'] == 'True':
-            result = f"Enter the OTP received: "
-            return result
-        otp = request.session[f'otp{session_id}']
- 
-        # Step 7: Validate OTP
-        validate_otp_url = "https://iochatbot.maximeyes.com/api/common/checkotp"
- 
-        validate_otp_payload = otp_payload.copy()
-        validate_otp_payload["OTP"] = otp
-        try:
-            validate_otp_response = requests.post(validate_otp_url, json=validate_otp_payload, headers=headers)
-            validate_otp_response.raise_for_status()
-            print(validate_otp_response)
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred while validating OTP: {e}")
-            return
-        if validate_otp_response.status_code != 200:
-            return f"Failed to validate OTP. Status code: {validate_otp_response.status_code}"
-        try:
-            validation_result = validate_otp_response.json()
-        except ValueError:
-            return "Failed to parse OTP validation response as JSON."
-        if not validation_result.get("Isvalidated"):
-            request.session[f'otp{session_id}'] = 'True'
-            return "Invalid OTP. Please try again."
-         
-    elif request.session[f'confirmation{session_id}'] == 'no':
-        msg=edit_msg(request)
-        return msg
-    
-    else :
-        intent=request.session[f'confirmation{session_id}']
-        context = conf_intent(request)
-        return context
+     # otp and confirmation shifted before location id and providers id 
     # Step 8: Book the appointment     
     try:
         request.session['appointment_scheduled']
@@ -1134,42 +821,24 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     return "Thanks, Have a great day! "
 
 
-# Instruction to guide the language model
-instruction = """You are a creative assistant for eye care services. You must ONLY provide information directly related to eye health, vision, and eye care services. If the user's query is not related to eye care, respond with EXACTLY this message: 'I apologize, but I can only answer questions related to eye care. If you have any eye-related questions, I'd be happy to help. For more information, please contact 'RoseCity@gmail.com' """
-# def generate_response(user_query, max_length=512, num_return_sequences=1):
-#     prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
-#     inputs = tokenizer(prompt, return_tensors="pt").to(base_model.device)
-#     outputs =base_model.generate(
-#         **inputs,
-#         max_length=max_length,
-#         num_return_sequences=num_return_sequences,
-#         pad_token_id=tokenizer.eos_token_id
-#     )
-#     response = tokenizer.batch_decode(outputs, skip_special_tokens=True)[0]
-    
-#     # Extract only the response part
-#     response = response.split("Response:")[-1].strip()    
-#     return response
-
 # Function to generate response using Hugging Face endpoint
-def generate_response(user_query, max_length=512, num_return_sequences=1):
-    prompt = f"{instruction}\n\nUser query: {user_query}\n\nResponse:"
+def generate_response(user_query):
 
-    api_url = "https://tpfuzx0pqdencyjo.us-east-1.aws.endpoints.huggingface.cloud"  
-    # api_token = os.getenv("HUGGINGFACE_API_TOKEN")
-   
-    return call_huggingface_endpoint(prompt, api_url, hugging_face_api_token)
-
-
+    prompt = (
+    f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+    instruction: You are a creative assistant for eye care services. You must ONLY provide information directly related to eye health, vision, and eye care services. If the user's query is not related to eye care, respond with EXACTLY this message: 'I apologize, but I can only answer questions related to eye care. If you have any eye-related questions, I'd be happy to help'
+    <|eot_id|>
+    <|start_header_id|>user<|end_header_id|>
+    {user_query}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+    """
+    )
+    response=call_huggingface_endpoint(prompt, api_url, hugging_face_api_token,256 ,False  ,0.9 ,0.9)
+    response_content = response[len(prompt):].strip()
+    return response_content
 # Function to interactively handle the user query
 def verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
   a=f"FirstName: {FirstName}\nLastName: {LastName}\nDOB: {DOB}\nPhoneNumber: {PhoneNumber}\nEmail: {Email}\nprefred_date_time: {prefred_date_time}"
 
-# funtion to updated the edited user info
-def update_field(extracted_info, field, value):
-    if value and value.lower() != "none":
-        extracted_info[field] = value
-    return extracted_info
 
 # funtion to validate email
 def validate_email(email):
@@ -1180,120 +849,133 @@ def validate_email(email):
 # funtion to validate email         
 def validate_phone(phone):
     # Regular expression pattern for a valid US phone number
-    pattern = r'^\d{10}$|^\(\d{3}\) \d{3}-\d{4}$'
+    pattern = r'^\d{10}$|^\(\d{3}\) \d{3}-\d{4}$|^\(\d{3}\)-\d{3}-\d{4}$'
     return re.match(pattern, phone) is not None
 
-# Handling user query
-def handle_user_query_postprocess(request,user_query):
-    intent = identify_intent(user_query)
-    if "greeting" in intent.lower():
-        prompt = "Hello! How can I assist you today? Do you need help with booking an appointment or something else?"
-        user_response = transform_input(prompt)
-        return user_response
-    
+def handle_user_query_postprocess(request, user_query):
     data = json.loads(request.body.decode('utf-8'))
     session_id = data.get('session_id', '')
-    data =data.get('practice1_details', '')
-    if "static" in intent.lower():
+
+    try:
+        # Check if intent is already stored in the session
+        print(request.session.get(f'intent{session_id}'),"request.session.get(f'intent{session_id}")
+        if not request.session.get(f'intent{session_id}'):
+            intent = identify_intent(user_query)
+            request.session[f'intent{session_id}'] = intent
+            print('getting new intent')
+        else:
+            intent = request.session[f'intent{session_id}']
+            print('getting old intent')
+    except :
+        # In case of an exception, identify intent and store it
+        intent = identify_intent(request, user_query, session_id)
+        print('getting old except intent')
+        request.session[f'intent{session_id}'] = intent
+
+    # Handle different intents
+    if "greeting" in intent.lower():
+
+        response = transform_input_greeting(user_query)
+        delete_session(request, session_id)
+        return response
+
+    data = data.get('practice1_details', '')
+
+    if "requesting static information" in intent.lower():
+        print("Requesting static information----")
         static_response = identify_intent_practice_question(user_query, data)
         if static_response:
-            delete_session(request,session_id)
+            delete_session(request, session_id)
             return static_response
-   
-    # If the intent is to book an appointment
-    if "booking an appointment" in intent.lower() or "schedule appointment" in intent.lower() or "book" in intent.lower():
-      extracted_info = fetch_info_openai(user_query)
-      
-      fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email','Preferred date or time']
-      
-      missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
-      print("missing fields",missing_fields)            
-     
-      fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email','Preferred date or time']  
-      if 'Email' not in missing_fields:
-        extracted_email=extracted_info['Email']
+
+    if any(keyword in intent.lower() for keyword in ["booking an appointment", "schedule appointment", "book"]):
+        print('book appointments---------------')
+
+        if not request.session.get(f'fields{session_id}'):
+            extracted_info = fetch_info(user_query)
+            print("regsjk0",extracted_info)
+            fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
+            missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
+
+            print("missing fields", missing_fields, 'user_query', user_query)
+
+            if 'Email' not in missing_fields:
+                extracted_email = extracted_info.get('Email', '')
+                if extracted_email and extracted_email not in ["none", '(empty)']:
+                    if not validate_email(extracted_email):
+                        prompt = f"Please provide a valid Email address. The email you provided is not valid."
+                        user_response = transform_input(prompt)
+                        message = request.session.get(f'context{session_id}', '')
+                        message = message.replace(extracted_email, '')
+                        request.session[f'context{session_id}'] = message
+                        return user_response
+
+            if 'PhoneNumber' not in missing_fields:
+                extracted_phone = extracted_info.get('PhoneNumber', '')
+                if extracted_phone and extracted_phone not in ["none", '(empty)']:
+                    if not validate_phone(extracted_phone):
+                        prompt = f"Please provide a valid Phone Number. The number you provided is not valid."
+                        user_response = transform_input(prompt)
+                        message = request.session.get(f'context{session_id}', '')
+                        message = message.replace(extracted_phone, '')
+                        request.session[f'context{session_id}'] = message
+                        return user_response
+
+            if len(missing_fields) == 1 and ('PhoneNumber' in missing_fields or 'Email' in missing_fields):
+                missing_fields = []
+
+        else:
+            extracted_info = request.session[f'fields{session_id}']
             
-        try:
-            if extracted_email != "" or extracted_email != "none" or extracted_email != '(empty)':
-                if validate_email(extracted_email)==False:
-                    prompt = f"Please provide your a valid Email address the email you provided is not valid" 
-                    user_response = transform_input(prompt)
-                    data = json.loads(request.body.decode('utf-8'))
-                    session_id = data.get('session_id', '')
-                    message=request.session[f'context{session_id}']
-                    message=message.replace(f'{extracted_email}','')
-                    request.session[f'context{session_id}']=message
-                    return user_response   
-        except:
-            pass
-      if 'PhoneNumber' not in missing_fields:
-        extracted_PhoneNumber=extracted_info['PhoneNumber']
-
-        try:
-            if extracted_PhoneNumber != "" or extracted_PhoneNumber != "none" or extracted_PhoneNumber != '(empty)':
-                if validate_phone(extracted_PhoneNumber)==False:
-                    prompt = f"Please provide your a valid Phone Number the one you provided is not valid" 
-                    user_response = transform_input(prompt)
-                    data = json.loads(request.body.decode('utf-8'))
-                    session_id = data.get('session_id', '')
-                    message=request.session[f'context{session_id}']
-                    message=message.replace(f'{extracted_PhoneNumber}','')
-                    request.session[f'context{session_id}']=message
-                    return user_response   
-        except:
-            pass
-      if len(missing_fields)==1 and ('PhoneNumber' in missing_fields or 'Email' in missing_fields):
-          print('only one thing is present' ,missing_fields)
-          missing_fields=[]
-      if missing_fields:
-
-        prompt = f"Please provide your {missing_fields}: " 
-        user_response = transform_input(prompt)
+            extracted_info = extracted_info.replace("'", '"').replace('(not provided)','').replace('(Not provided)','')
+            extracted_info = json.loads(extracted_info)
+            
+            fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
+            missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
+        print(extracted_info,'extracted_info')
+        if missing_fields:
+            prompt = f" Please provide your {', '.join(missing_fields)}: "
+            print('missing_fields+++')
+            user_response = transform_input(prompt)
+            return user_response
+        else:
+            request.session[f'fields{session_id}'] = str(extracted_info)
         
-        return user_response 
-      
-     
-      while missing_fields or len(missing_fields)==0:
         while missing_fields:
             prompt = f"Please provide your {missing_fields}: " 
             user_response = transform_input(prompt)
-            additional_info = fetch_info_openai(user_response)
-
+            additional_info = fetch_info(user_response)    
             for key in extracted_info:
               
               if not extracted_info[key] and key in additional_info:
-                  extracted_info[key] = additional_info[key]
-
+                  extracted_info[key] = additional_info[key]    
             if 'DateOfBirth' in extracted_info and extracted_info['DateOfBirth']:
-                extracted_info['DateOfBirth'] = convert_date_format(extracted_info['DateOfBirth'])
-
+                extracted_info['DateOfBirth'] = format_appointment_date(extracted_info['DateOfBirth'])    
             missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
             print(extracted_info)
-            
-
+        print((extracted_info),'extracted info :')        
         FirstName = extracted_info.get('FirstName')
         LastName = extracted_info.get('LastName')
         DOB = extracted_info.get('DateOfBirth')
         PhoneNumber = extracted_info.get('PhoneNumber')
         Email = extracted_info.get('Email')
-        prefred_date_time = extracted_info.get('Preferred date or time')
-
-        verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
-
+        prefred_date_time = extracted_info.get('Preferred date or time')    
+        verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)    
         # Get authentication token
         auth_token = get_auth_token(vendor_id, vendor_password, account_id, account_password)
         if not auth_token:
             return "Failed to authenticate."
-       
+        
         if 'confirmation' in request.session:
             if request.session[f'confirmation{session_id}'].lower() == 'no':
                 edit_response = edit_msg(request)
                 print("led",edit_response)
-                return edit_response
-
+                return edit_response    
         # Book the appointment
         print(prefred_date_time,'prefred_date_time -----------------')
-        preferred = prefred_date_time_fun(prefred_date_time)
+        preferred = format_appointment_date(prefred_date_time)
+        prefred_date_time=preferred
+        DOB=format_appointment_date(DOB)
         print(type(preferred),'=========',preferred)
         if 'Date is in the past' in preferred:
             data = json.loads(request.body.decode('utf-8'))
@@ -1304,19 +986,104 @@ def handle_user_query_postprocess(request,user_query):
                 "{message}"
                 Please remove the placeholder `{prefred_date_time}` and return the updated text without changing anything else."""   
             )
-            chat_completion = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ]
-            )
-            message = chat_completion.choices[0].message.content.strip()
+            
+            message = call_huggingface_endpoint(prompt, api_url, hugging_face_api_token,256 ,False  ,0.5 ,0.9)
             request.session[f'context{session_id}']=message
             print(message,'====================+')
             return 'Please provide a valid date time for Appointment'  
+        
+        
+        #step for otp and confirmation----
+        
+        
+        confirmation_message = (
+            f"Here are the details of your appointment:\n"
+            
+            f"Date and Time: {preferred}\n"
+            f"Name: {FirstName} {LastName}\n"
+            f"DOB: {DOB}\n"
+            f"Phone: {PhoneNumber}\n"
+            f"Email: {Email}\n"
+            f"Is this information correct? (yes/no)"
+        )
+        try:
+            print(request.session[f'confirmation{session_id}'],'======================')
+        except:
+            request.session[f'confirmation{session_id}'] = 'True'
+        
+        if request.session[f'confirmation{session_id}'] == "True":
+            return confirmation_message
+        
+        # Step 6: If user confirms, send OTP. Only after user confirms, proceed with OTP
+        
+        
+        if request.session[f'confirmation{session_id}'] == 'yes':
+            send_otp_url = "https://iochatbot.maximeyes.com/api/common/sendotp"
+            # DOB=prefred_date_time_fun(DOB)
+            # DOB=format_appointment_date(DOB)
+            otp_payload = {
+                "FirstName": FirstName,
+                "LastName": LastName,
+                "DOB": DOB,
+                "PhoneNumber": PhoneNumber,
+                "Email": Email
+            }
+            headers = {
+                    'Content-Type': 'application/json',
+                    'apiKey': f'bearer {auth_token}'}
+            print(otp_payload,'otp_payload')
+            try:
+                otp_response = requests.post(send_otp_url, json=otp_payload, headers=headers)
+                otp_response.raise_for_status()
+            except requests.exceptions.RequestException as e:
+                print(f"An error occurred while sending OTP: {e}")
+                return
+            if otp_response.status_code != 200:
+                return f"Failed to send OTP. Status code: {otp_response.status_code}"
+    
+            try:
+                request.session[f'otp{session_id}']
+            except:
+                request.session[f'otp{session_id}'] = 'True'
+            result = ''
+            if request.session[f'otp{session_id}'] == 'True':
+                result = f"Enter the OTP received: "
+                return result
+            otp = request.session[f'otp{session_id}']
+    
+            # Step 7: Validate OTP
+            validate_otp_url = "https://iochatbot.maximeyes.com/api/common/checkotp"
+    
+            validate_otp_payload = otp_payload.copy()
+            validate_otp_payload["OTP"] = otp
+            try:
+                validate_otp_response = requests.post(validate_otp_url, json=validate_otp_payload, headers=headers)
+                validate_otp_response.raise_for_status()
+                print(validate_otp_response)
+            except requests.exceptions.RequestException as e:
+                print(f"An error occurred while validating OTP: {e}")
+                return
+            if validate_otp_response.status_code != 200:
+                return f"Failed to validate OTP. Status code: {validate_otp_response.status_code}"
+            try:
+                validation_result = validate_otp_response.json()
+            except ValueError:
+                return "Failed to parse OTP validation response as JSON."
+            if not validation_result.get("Isvalidated"):
+                request.session[f'otp{session_id}'] = 'True'
+                return "Invalid OTP. Please try again."
+            
+        elif request.session[f'confirmation{session_id}'] == 'no':
+            msg=edit_msg(request)
+            return msg
+        
+        else :
+            
+            context = confirmation_intent(request)
+            return context
+    
+
+        # step to get location id provides id 
         book_appt = book_appointment(request,auth_token, FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)
         
         try:
@@ -1327,14 +1094,13 @@ def handle_user_query_postprocess(request,user_query):
                 print('Appointment scheduled successfully---')
                 pass
         except:
-            pass
-
+            pass    
         return book_appt
     
-  #If the intent is not related to booking, generate a response using the fine-tuned model
+  #    f the intent is not related to booking, generate a response using the fine-tuned model
     else:
         response = generate_response(user_query)
-        print(response,'response--------')
+        print(response,'response111--------')
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         delete_session(request,session_id)
@@ -1385,18 +1151,25 @@ def delete_session(request,session_id):
             del request.session[f'appointment_scheduled{session_id}']
         except:
             print('Not able to delete appointment_scheduled')
+        try:
+            del request.session[f'intent{session_id}']
+        except:
+            print('Not able to delete appointment_scheduled')
+        try:
+            del request.session[f'fields{session_id}']
+        except:
+            print('Not able to delete appointment_scheduled')
 
-
-   
+        
         return request
 
 def home(request):
-    if 'session_id1' in request.session:
-        session_id=request.session['session_id1']
-    else:
+    # if 'session_id1' in request.session:
+    #     session_id=request.session['session_id1']
+    # else:
 
-        request.session['session_id1'] = str(uuid.uuid4())
-        session_id=request.session['session_id1'] 
+    request.session['session_id1'] = str(uuid.uuid4())
+    session_id=request.session['session_id1'] 
 
     # request.session._session_key_prefix = 'view1'
     context = {
@@ -1412,12 +1185,12 @@ def home(request):
     return render(request, "pages/home.html", context)
 def home2(request):
     # request.session._session_key_prefix = 'view2'
-    if 'session_id2' in request.session:
-        session_id=request.session['session_id2']
-    else:
+    # if 'session_id2' in request.session:
+    #     session_id=request.session['session_id2']
+    # else:
 
-        request.session['session_id2'] = str(uuid.uuid4())
-        session_id=request.session['session_id2'] 
+    request.session['session_id2'] = str(uuid.uuid4())
+    session_id=request.session['session_id2'] 
 
     context = {
         'session_id':session_id,
@@ -1432,19 +1205,20 @@ def home2(request):
 @csrf_exempt
 def func(request):
     resp=''
-    
+    memory = ConversationBufferMemory()
     if request.method=='POST':
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         message = data.get('input', '')
         querry=message
         
+        
         if  request.session.get(f'book_appointment{session_id}')=='True':
             try:
                 request.session[f'book_appointment{session_id}']=message
             except:
                 print('Not able select location')
-
+        
         if  request.session.get(f'provider_id{session_id}')=='True':
             try:
                 request.session[f'provider_id{session_id}']=message
@@ -1486,16 +1260,12 @@ def func(request):
     # return render(request, "pages/home.html",{'resp':resp,'return_response':return_response})
     return JsonResponse({"response": resp})
 
-def func1(request):
-    data = json.loads(request.body.decode('utf-8'))
-    message = data.get('input', '')
-    session_id = data.get('session_id', '')
-    return JsonResponse({"response": 'success'})
+
 
 @csrf_exempt
 @require_POST
 def handle_user_query(request):
-    
+    # memory = ConversationBufferMemory()
     try:
         data = json.loads(request.body.decode('utf-8'))
         message = data.get('input', '')
@@ -1503,14 +1273,16 @@ def handle_user_query(request):
     except:
         message=''
         session_id = 0
+    # print(session_id,'session_id',message)
     if request.method != 'POST':
         return JsonResponse({"error": "Invalid request method"}, status=405)
     try:
         
-        request.session[f'context{session_id}']= request.session[f'context{session_id}'] +' '+message
+        request.session[f'context{session_id}']= request.session[f'context{session_id}'] +' '+ message
+        print('editing',request.session[f'context{session_id}'],'-----',message)
     except:
         request.session[f'context{session_id}']=message
-    
+    print(session_id,'session_id',message,'message', request.session[f'context{session_id}'],f" request.session[f'context{session_id}']")
     try:
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
@@ -1518,13 +1290,20 @@ def handle_user_query(request):
         if not input_message:
             return JsonResponse({"error": "Missing 'message' in 'query' data"}, status=400)
 
-        # try:
+        print(input_message)
+
         response = handle_user_query_postprocess(request,input_message)
+
+        # memory.save_context({"User": input_message}, {"Assistant": response})
+
+
         if response=='none' or response==None:
             data = json.loads(request.body.decode('utf-8'))
 
             response=f"Please contact :{data.get('practice_email', '')} "
             return response
+        
+
         return response
    
     except json.JSONDecodeError as e:

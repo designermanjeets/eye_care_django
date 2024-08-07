@@ -157,6 +157,9 @@ CACHES = {
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_AGE = 60*60
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 LANGUAGE_CODE = "en-us"
