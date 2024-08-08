@@ -182,6 +182,7 @@ def identify_intent_practice_question(user_query,data):
         3. If the query does not match any information available, respond with "Please provide valid information."
         4. If the query does not fit into the above categories, respond with "I'm sorry, I can't provide that information. Can you ask about something else related to our services or appointments?"
         5. If you don't understand the query, ask for clarification rather than returning the same text.
+        6. if it is related to any glasses ques respond with "I'm sorry, I can't provide that information. Can you ask about something else related to our services or appointments?"
         please follow the above instructions carefully.
         Avoid formal language; aim for a friendly and human-like tone.
         <|eot_id|>
