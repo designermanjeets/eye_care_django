@@ -99,9 +99,9 @@ def call_huggingface_endpoint(prompt, api_url, api_token,  max_new_tokens,  do_s
 def fetch_info(response):
     modelPromptForAppointment = f"""
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
- 
-        Extract the following information from {response}: FirstName, LastName, DateOfBirth, Email, PhoneNumber and PreferredDateOrTime  if available ,determine what could be the information
-        also note that if any fields in the information is not there return it as empty field and extract the field which are given
+        text: {response}
+        Extract the following information from given text : FirstName, LastName, DateOfBirth, Email, PhoneNumber and PreferredDateOrTime  if available ,determine what could be the information
+        also note that if any fields in the information is not there return it as empty field. 
         instruction:
         -read the full information carefully
         -please provide indexing
@@ -111,7 +111,7 @@ def fetch_info(response):
         """
     try:
         result = call_huggingface_endpoint(modelPromptForAppointment, api_url, hugging_face_api_token,256 ,False  ,0.1 ,0.9)
-        result=result[len(modelPromptForAppointment):].strip().replace('*','')
+        result=result[len(modelPromptForAppointment):].strip().replace('*','').replace('Not available','').replace('not available','').replace('(Not available)','')
         print('fetched info srting',result)
         data_dict = {}
         for line in result.split('\n'):
@@ -120,7 +120,7 @@ def fetch_info(response):
                 matches = re.findall(pattern, line)
                 if matches:
                     key, value = matches[0][1].strip(), matches[0][2].strip()
-                    data_dict[key] = (value).replace('(empty field)','')
+                    data_dict[key] = (value).replace('(empty field)','').replace('not Available','').replace('(not available)','').replace('Not mentioned','').replace('Not Mentioned','')
  
         
         return data_dict
@@ -321,7 +321,7 @@ def format_appointment_date(date):
                 -day today is : {day}
             calculate the date according to users querry: {date}
             change the date in this format:"%m/%d/%Y" or  "month/day/year" 
-            
+            and return date in mm/dd/yyyy format only
             example: mm/dd/yyyy
             please provide only response
             <|eot_id|>
@@ -337,7 +337,8 @@ def transform_input(input_text):
     # Define a list of prompts to transform the input text
     modelPromptTotransform = f"""
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        how would you ask this {input_text} as a question in a friendly and conversational tone related to appointment? please provide only one option at a time
+        how would you ask this {input_text} as a question in a friendly and conversational tone related to appointment? 
+        give only one option.
         user
         <|eot_id|><|start_header_id|>assistant<|end_header_id|>
     """
@@ -773,6 +774,7 @@ def handle_user_query_postprocess(request, user_query):
 
             print("missing fields", missing_fields, 'user_query', user_query)
 
+            
             if 'Email' not in missing_fields:
                 extracted_email = extracted_info.get('Email', '')
                 if extracted_email and extracted_email not in ["none", '(empty)']:
