@@ -94,17 +94,25 @@ def call_huggingface_endpoint(prompt, api_url, api_token,  max_new_tokens,  do_s
 #     return date_str
 
 # function to extract user info
+
+
 def fetch_info(response):
     modelPromptForAppointment = f"""
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-
-        Extract the following information from {response}: FirstName, LastName, DateOfBirth, Email, PhoneNumber and Preferred date or time  if available ,determine what could be the information <|eot_id|>
+ 
+        Extract the following information from {response}: FirstName, LastName, DateOfBirth, Email, PhoneNumber and PreferredDateOrTime  if available ,determine what could be the information
+        also note that if any fields in the information is not there return it as empty field and extract the field which are given
+        instruction:
+        -read the full information carefully
+        -please provide indexing
+        <|eot_id|>
         <|start_header_id|>user<|end_header_id|>
         <|eot_id|><|start_header_id|>assistant<|end_header_id|>
         """
     try:
         result = call_huggingface_endpoint(modelPromptForAppointment, api_url, hugging_face_api_token,256 ,False  ,0.1 ,0.9)
-        result=result[len(modelPromptForAppointment):].strip()
+        result=result[len(modelPromptForAppointment):].strip().replace('*','')
+        print('fetched info srting',result)
         data_dict = {}
         for line in result.split('\n'):
             if ':' in line:
@@ -112,14 +120,13 @@ def fetch_info(response):
                 matches = re.findall(pattern, line)
                 if matches:
                     key, value = matches[0][1].strip(), matches[0][2].strip()
-                    data_dict[key] = (value).replace('(not provided)','').replace('(Not provided)','')
-
-        print(data_dict)
+                    data_dict[key] = (value).replace('(empty field)','')
+ 
+        
         return data_dict
     except Exception as e:
         print(f"Error extracting information: {e}")
         return {}
-
 # Function to identify intent
 def identify_intent(user_query):
     
@@ -146,7 +153,7 @@ def identify_intent(user_query):
             intent = call_huggingface_endpoint(model_prompt_for_intent, api_url, hugging_face_api_token,256 ,False  ,0.1 ,0.9)
             
             intent = intent[len(model_prompt_for_intent):].strip().split('\n')[0]  # Extract only the first line of the output
-            print("Intent2222:", intent,'222222')
+            
             return intent
             # return intent
         except requests.exceptions.RequestException as e:
@@ -192,7 +199,7 @@ def edit_msg(request):
     data = json.loads(request.body.decode('utf-8'))
     session_id = data.get('session_id', '')
     user_response=''
-    fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
+    fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'PreferredDateOrTime']
     
     try:
         request.session[f'edit_msg{session_id}']
@@ -205,7 +212,7 @@ def edit_msg(request):
         # Convert context from JSON string to dictionary if necessary
         
         # List of all possible fields
-        fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
+        fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'PreferredDateOrTime']
    
         # Ask which fields the user wants to edit
         prompt = "Which of the following fields would you like to edit? " + ", ".join(fields) 
@@ -268,7 +275,7 @@ def confirmation_intent(request):
                 <|start_header_id|>user<|end_header_id|>
                 {user_input}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
                 """
-    response_content = call_huggingface_endpoint(response_content_prompt, api_url, hugging_face_api_token,256 ,False  ,0.09 ,0.9)
+    response_content = call_huggingface_endpoint(response_content_prompt, api_url, hugging_face_api_token,256 ,False  ,0.9 ,0.9)
     response_content = response_content[len(response_content_prompt):].strip()
     if response_content == 'yes':
         request.session[f'confirmation{session_id}'] = 'yes'
@@ -306,7 +313,8 @@ def format_appointment_date(date):
     model_prompt_for_appointment = f"""
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
         Instructions:
-        change the date in this format:"%m/%d/%Y" or  "month/day/year"
+        change the date in this format:"%m/%d/%Y" or  "month/day/year" 
+        example: mm/dd/yyyy
         please provide only response
         <|eot_id|>
         <|start_header_id|>user<|end_header_id|>
@@ -320,7 +328,7 @@ def transform_input(input_text):
     # Define a list of prompts to transform the input text
     modelPromptTotransform = f"""
         <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        how would you ask this {input_text} as a question in a friendly and conversational tone related to appointment? please provide only one option
+        how would you ask this {input_text} as a question in a friendly and conversational tone related to appointment? please provide only one option at a time
         user
         <|eot_id|><|start_header_id|>assistant<|end_header_id|>
     """
@@ -362,211 +370,8 @@ def get_auth_token(vendor_id, vendor_password, account_id, account_password) -> 
     except json.JSONDecodeError:
         return "Failed to decode JSON response"
 
-# Funtion for date format as per API requirement
-# def format_appointment_date(from_date):
-#     parsed_date = datetime.strptime(from_date, "%Y-%m-%dT%H:%M:%S")
-#     return parsed_date.strftime("%m/%d/%Y")
 
-# extracting day as per prefered date for appointment
-# def prefred_date_time_fun(response):
-#     print("response12",response)
-#     def get_next_weekday(day_name, use_next=False):
-#     # Dictionary to convert day names to weekday numbers
-#         days_of_week = {
-#             'monday': 0, 'mon': 0, 'Monday': 0, 'Mon': 0,
-#             'tuesday': 1, 'tues': 1,'Tuesday': 1, 'Tues': 1,
-#             'wednesday': 2, 'wed': 2,'Wednesday': 2, 'Wed': 2,
-#             'thursday': 3, 'thurs': 3,'Thursday': 3, 'Thurs': 3,
-#             'friday': 4, 'fri': 4,'Friday':4, 'Fri':4,
-#             'saturday': 5, 'sat': 5,'Saturday': 5, 'Sat': 5,
-#             'sunday': 6, 'sun': 6,'Sunday': 6, 'Sun': 6
-#         }
 
-#         # Get today's date and the current weekday
-#         today = datetime.now()
-#         current_weekday = today.weekday()
-
-#         # Convert the day name to a weekday number
-#         target_weekday = days_of_week[day_name.lower()]
-
-#         # Calculate the number of days until the next target weekday
-#         days_until_target = (target_weekday - current_weekday + 7) % 7
-
-#         if days_until_target == 0 or use_next:
-#             days_until_target += 7
-
-#         # Calculate the date for the next target weekday
-#         next_weekday = today + timedelta(days=days_until_target)
-#         return next_weekday
-
-#     def get_upcoming_weekday(day_name):
-#         # Dictionary to convert day names to weekday numbers
-#         days_of_week = {
-#             'monday': 0, 'mon': 0, 'Monday': 0, 'Mon': 0,
-#             'tuesday': 1, 'tues': 1,'Tuesday': 1, 'Tues': 1,
-#             'wednesday': 2, 'wed': 2,'Wednesday': 2, 'Wed': 2,
-#             'thursday': 3, 'thurs': 3,'Thursday': 3, 'Thurs': 3,
-#             'friday': 4, 'fri': 4,'Friday':4, 'Fri':4,
-#             'saturday': 5, 'sat': 5,'Saturday': 5, 'Sat': 5,
-#             'sunday': 6, 'sun': 6,'Sunday': 6, 'Sun': 6
-#         }
-#         # Get today's date and the current weekday
-#         today = datetime.now()
-#         current_weekday = today.weekday()
-
-#         # Convert the day name to a weekday number
-#         target_weekday = days_of_week[day_name.lower()]
-
-#         # Calculate the number of days until the upcoming target weekday
-#         days_until_target = (target_weekday - current_weekday + 7) % 7
-
-#         # If the day is today and has not passed, use today's date
-#         if days_until_target == 0:
-#             next_weekday = today
-#         else:
-#             next_weekday = today + timedelta(days=days_until_target)
-            
-#         return next_weekday
-
-#     def get_relative_day(keyword):
-#         today = datetime.now()
-#         if keyword == "tomorrow":
-#             return today + timedelta(days=1)
-#         elif keyword == "day after tomorrow":
-#             return today + timedelta(days=2)
-#         return None
-
-#     def extract_date_from_response(response):
-#         keywords = ["next", "coming", "upcoming", "tomorrow", "day after tomorrow"]
-#         use_next = any(keyword in response.lower() for keyword in ["next", "coming"])
-#         use_upcoming = "upcoming" in response.lower()
-
-#         # Check for "tomorrow" and "day after tomorrow"
-#         relative_day = None
-#         for keyword in ["tomorrow", "day after tomorrow"]:
-#             if keyword in response.lower():
-#                 relative_day = get_relative_day(keyword)
-#                 response = re.sub(keyword, "", response, flags=re.IGNORECASE).strip()
-#                 break
-
-#         # Extract the day name from the response
-#         day_name_match = re.search(r'\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tues|Wed|Thurs|Fri|Sat|Sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tues|wed|thurs|fri|sat|sun)\b', response, re.IGNORECASE)
-#         if day_name_match:
-#             day_name = day_name_match.group(0)
-#         else:
-#             day_name = None
-
-#         if relative_day:
-#             if day_name:
-#                 # If there's a specific day mentioned, calculate from the relative day
-#                 next_day = get_next_weekday(day_name)
-#                 if next_day <= relative_day:
-#                     next_day += timedelta(days=7)
-#                 if next_day < datetime.now():
-#                     return "Date is in the past"
-#                 return next_day.strftime("%Y-%m-%dT%H:%M:%S")
-#             else:
-#                 return relative_day.strftime("%Y-%m-%dT%H:%M:%S")
-#         else:
-#             # Remove the keyword from the input if it exists
-#             for keyword in ["next", "coming", "upcoming"]:
-#                 response = re.sub(keyword, "", response, flags=re.IGNORECASE).strip()
-
-#             if day_name:
-#                 if use_upcoming:
-#                     next_day = get_upcoming_weekday(day_name)
-#                 else:
-#                     next_day = get_next_weekday(day_name, use_next)
-#                 if next_day < datetime.now():
-#                     return "Date is in the past"
-#                 return next_day.strftime("%Y-%m-%dT%H:%M:%S")
-#             else:
-#                 return "No valid day found in the response"
-#     if "next" in response.lower() or "coming" in response.lower() or "upcoming" in response.lower() or "tomorrow" in response.lower() or "next day" in response.lower():
-        
-#         return extract_date_from_response(response)
-
-#     else:
-#         response=response.replace(',','')
-#         patterns = [
-#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})   (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})  (Morning|Afternoon|Evening|Night)\b', '%B %d %Y'),
-#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
-#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{1,2}) (\d{4})\b', '%B %d %Y'),
-#             (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %B %Y'),
-#             (r'(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December|january|february|march|april|May|june|july|august|september|october|november|december) (\d{4})\b', '%d %B %Y'),
-#             (r'\b(January|February|March|April|May|June|July|August|September|October|November|December) (\d{1,2}) (\d{4})\b','%B %d %Y'), # Added this line
-#             (r'\b(\d{1,2}) (AM|PM)\b', None),
-#             (r'\b(Morning|Afternoon|Evening|Night)\b', None),
-#             (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m/%d/%Y'),
-#             (r'\b(0[1-9]|1[0-2])(\/|-)(0[1-9]|[12][0-9]|3[01])(\/|-)(19|20)\d{2}\b', '%m-%d-%Y'),
-#             (r'\b(0[1-9]|[12][0-9]|3[01])(\/|-)(0[1-9]|1[0-2])(\/|-)(19|20)\d{2}\b', '%d/%m/%Y'),
-#             (r'\b(0[1-9]|[12][0-9]|3[01])(\/|-)(0[1-9]|1[0-2])(\/|-)(19|20)\d{2}\b', '%d-%m-%Y'),
-#             (r'\b(\d{4})-(\d{2})-(\d{1,2})\b', '%Y-%m-%d'),
-#             (r'\b(\d{2})/(\d{1,2})/(\d{4})\b', '%m/%d/%Y'),
-#             (r'\b(\d{4})/(\d{2})/(\d{1,2})\b', '%Y/%m/%d'),
-#             (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d, %Y'),
-#             (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%b %d %Y'),
-#             (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}), (\d{4})\b', '%b %d, %Y'),
-#             (r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{1,2}) (\d{4})\b', '%b %d %Y'),
-#             (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4}) (Morning|Afternoon|Evening|Night)\b', '%d %b %Y'),
-#             (r'(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec) (\d{4})\b', '%d %b %Y'),
-#     ]
-        
-#         # Time mappings for periods of the day
-#         time_mappings = {
-#             "Morning": 9,
-#             "Afternoon": 15,
-#             "Evening": 18,
-#             "Night": 21
-#         }
-    
-#         datetime_obj = None    
-#         for pattern, date_format in patterns:
-#             match = re.search(pattern, response)
-            
-#             if match:
-#                 groups = match.groups()
-#                 if date_format:
-                    
-#                     date_str = ' '.join(groups[:3])
-                    
-#                     datetime_obj = datetime.strptime(date_str, date_format)
-#                     if len(groups) == 4:  # If there's a time of day
-#                         period = groups[3]
-#                         hour = time_mappings.get(period, 12)
-#                         datetime_obj = datetime_obj.replace(hour=hour)
-#                         if datetime_obj < datetime.now():
-#                             return "Date is in the past"
-#                     break
-#                 else:
-#                     if len(groups) == 2 and groups[1] in ["AM", "PM"]:
-#                         hour, am_pm = groups
-#                         hour = int(hour)
-#                         if am_pm == 'PM' and hour != 12:
-#                             hour += 12
-#                         elif am_pm == 'AM' and hour == 12:
-#                             hour = 0
-#                         if datetime_obj:
-#                             datetime_obj = datetime_obj.replace(hour=hour)
-#                         else:
-#                             datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)
-    
-#                     elif len(groups) == 1 and groups[0] in time_mappings:
-#                         period = groups[0]
-#                         hour = time_mappings[period]
-#                         if datetime_obj:
-#                             datetime_obj = datetime_obj.replace(hour=hour)
-#                         else:
-#                             datetime_obj = datetime.combine(datetime.now().date(), datetime.min.time()).replace(hour=hour)    
-#                 break
-    
-#         if not datetime_obj:
-#             raise ValueError("No valid date format found in the response")
-    
-#         return datetime_obj.isoformat()
 
 # Tool to book appointment
 def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber, Email, prefred_date_time):
@@ -696,6 +501,7 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
     # Step 4: Get the open slots for the selected location, provider, and reason
     print(prefred_date_time,'prefred_date_time -----------------')
     preferred = format_appointment_date(prefred_date_time)
+
     print(type(preferred),'=========',preferred)
     if 'Date is in the past' in preferred:
         data = json.loads(request.body.decode('utf-8'))
@@ -817,10 +623,30 @@ def book_appointment(request, auth_token, FirstName, LastName, DOB, PhoneNumber,
         data = json.loads(request.body.decode('utf-8'))
         session_id = data.get('session_id', '')
         del request.session[f'context{session_id}']
+        delete_session(request,session_id)
         return result    
     return "Thanks, Have a great day! "
 
-
+def update_context(request,text):
+    data = json.loads(request.body.decode('utf-8'))
+    session_id = data.get('session_id', '')
+    context = request.session[f'context{session_id}']
+    response_content_prompt = f"""
+                <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+                "This is my current information: {context}\n"
+                Instructions:
+                - If the user specifies which information to change, provide the updated context with those changes applied only and return the full context donot delete anything.
+                
+                please follow the above instructions carefully.
+                <|eot_id|>
+                <|start_header_id|>user<|end_header_id|>
+                {text}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+                """
+    response_content = call_huggingface_endpoint(response_content_prompt, api_url, hugging_face_api_token,256 ,False  ,0.09 ,0.9)
+    response_content = response_content[len(response_content_prompt):].strip()
+    delete_session(request,session_id)
+    request.session[f'context{session_id}'] = response_content.replace('"','')
+    return response_content
 # Function to generate response using Hugging Face endpoint
 def generate_response(user_query):
 
@@ -837,6 +663,8 @@ def generate_response(user_query):
     return response_content
 # Function to interactively handle the user query
 def verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time):
+  
+
   a=f"FirstName: {FirstName}\nLastName: {LastName}\nDOB: {DOB}\nPhoneNumber: {PhoneNumber}\nEmail: {Email}\nprefred_date_time: {prefred_date_time}"
 
 
@@ -851,6 +679,43 @@ def validate_phone(phone):
     # Regular expression pattern for a valid US phone number
     pattern = r'^\d{10}$|^\(\d{3}\) \d{3}-\d{4}$|^\(\d{3}\)-\d{3}-\d{4}$'
     return re.match(pattern, phone) is not None
+
+
+def validate_date(request,preferred_date_time,DOB):
+    current_date = datetime.now()
+    preferred_date_time = datetime.strptime(preferred_date_time.strip(), '%m/%d/%Y')
+    DOB = datetime.strptime(DOB.strip(), '%m/%d/%Y')
+    print(current_date,preferred_date_time,DOB,type(preferred_date_time),(DOB))
+    
+    # Initialize validity flags
+    preferred_valid = 'valid'
+    dob_valid = 'valid'
+    
+    # Validate preferred_date_time
+    if preferred_date_time < current_date:
+        preferred_valid = 'not valid'
+    
+    # Validate DOB
+    if DOB > current_date:
+        dob_valid = 'not valid'
+    
+    # Return results based on the validity of both dates
+    if preferred_valid == 'not valid' and dob_valid == 'not valid':
+        text = "remove the date of birth and preferred date and time fro appointment from the context"
+        print(update_context(request,text))
+        return 'Please provide valid Appointment date and time and Date of birth '
+    elif preferred_valid == 'not valid':
+        text = " remove preferred date and time for appointment from the context"
+        print(update_context(request,text))
+        return 'Please provide valid Appointment date and time'
+    elif dob_valid == 'not valid':
+        text = "remove date of birth from the context"
+        print(update_context(request,text))
+        return 'Please provide valid Date of birth'
+    else:
+        return True
+    
+       
 
 def handle_user_query_postprocess(request, user_query):
     data = json.loads(request.body.decode('utf-8'))
@@ -871,7 +736,7 @@ def handle_user_query_postprocess(request, user_query):
         intent = identify_intent(request, user_query, session_id)
         print('getting old except intent')
         request.session[f'intent{session_id}'] = intent
-
+    
     # Handle different intents
     if "greeting" in intent.lower():
 
@@ -894,7 +759,7 @@ def handle_user_query_postprocess(request, user_query):
         if not request.session.get(f'fields{session_id}'):
             extracted_info = fetch_info(user_query)
             print("regsjk0",extracted_info)
-            fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
+            fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'PreferredDateOrTime']
             missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
 
             print("missing fields", missing_fields, 'user_query', user_query)
@@ -930,7 +795,7 @@ def handle_user_query_postprocess(request, user_query):
             extracted_info = extracted_info.replace("'", '"').replace('(not provided)','').replace('(Not provided)','')
             extracted_info = json.loads(extracted_info)
             
-            fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'Preferred date or time']
+            fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'PreferredDateOrTime']
             missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
         print(extracted_info,'extracted_info')
         if missing_fields:
@@ -959,7 +824,7 @@ def handle_user_query_postprocess(request, user_query):
         DOB = extracted_info.get('DateOfBirth')
         PhoneNumber = extracted_info.get('PhoneNumber')
         Email = extracted_info.get('Email')
-        prefred_date_time = extracted_info.get('Preferred date or time')    
+        prefred_date_time = extracted_info.get('PreferredDateOrTime')    
         verification_check(FirstName, LastName, DOB, PhoneNumber, Email,prefred_date_time)    
         # Get authentication token
         auth_token = get_auth_token(vendor_id, vendor_password, account_id, account_password)
@@ -974,8 +839,15 @@ def handle_user_query_postprocess(request, user_query):
         # Book the appointment
         print(prefred_date_time,'prefred_date_time -----------------')
         preferred = format_appointment_date(prefred_date_time)
+        
+        
         prefred_date_time=preferred
         DOB=format_appointment_date(DOB)
+        print(DOB,'dob=======--+++')
+        validation=validate_date(request,prefred_date_time,DOB)
+        if validation != True:
+            return validation
+
         print(type(preferred),'=========',preferred)
         if 'Date is in the past' in preferred:
             data = json.loads(request.body.decode('utf-8'))
