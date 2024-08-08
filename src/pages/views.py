@@ -34,7 +34,7 @@ headers = {
 # Define the function to call the Hugging Face endpoint
 def call_huggingface_endpoint(prompt, api_url, api_token,  max_new_tokens,  do_sample, temperature, top_p ,max_length=512,retries=1, backoff_factor=0.3):
     headers = {
-        "Authorization": f"Bearer {api_token}",
+        "Authorization": f"Bearer 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",
         "Content-Type": "application/json"
     }
     data = {
