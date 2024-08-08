@@ -311,19 +311,27 @@ def transform_input_greeting(user_input):
 
 # function for transforming the responses
 def format_appointment_date(date):
+    current_date=datetime.now().strftime("%B %d, %Y")
+
+    day=datetime.now().strftime('%A')
     model_prompt_for_appointment = f"""
-        <|begin_of_text|><|start_header_id|>system<|end_header_id|>
-        Instructions:
-        change the date in this format:"%m/%d/%Y" or  "month/day/year" 
-        example: mm/dd/yyyy
-        please provide only response
-        <|eot_id|>
-        <|start_header_id|>user<|end_header_id|>
-        {date}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
-        """
+            <|begin_of_text|><|start_header_id|>system<|end_header_id|>
+            Instructions:
+                -current date is : {current_date} 
+                -day today is : {day}
+            calculate the date according to users querry: {date}
+            change the date in this format:"%m/%d/%Y" or  "month/day/year" 
+            
+            example: mm/dd/yyyy
+            please provide only response
+            <|eot_id|>
+            <|start_header_id|>user<|end_header_id|>
+            {date}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+            """
     response = call_huggingface_endpoint(model_prompt_for_appointment, api_url, hugging_face_api_token,256 ,False  ,0.9 ,0.9)
     response_content = response[len(model_prompt_for_appointment):].strip()
     return response_content
+
 
 def transform_input(input_text):
     # Define a list of prompts to transform the input text
