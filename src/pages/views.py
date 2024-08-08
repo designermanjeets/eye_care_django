@@ -806,6 +806,30 @@ def handle_user_query_postprocess(request, user_query):
             
             fields = ['FirstName', 'LastName', 'DateOfBirth', 'PhoneNumber', 'Email', 'PreferredDateOrTime']
             missing_fields = [field for field in fields if not extracted_info.get(field) or extracted_info.get(field).lower() == "none"]
+            if 'Email' not in missing_fields:
+                extracted_email = extracted_info.get('Email', '')
+                if extracted_email and extracted_email not in ["none", '(empty)']:
+                    if not validate_email(extracted_email):
+                        prompt = f"Please provide a valid Email address. The email you provided is not valid."
+                        user_response = transform_input(prompt)
+                        message = request.session.get(f'context{session_id}', '')
+                        message = message.replace(extracted_email, '')
+                        request.session[f'context{session_id}'] = message
+                        return user_response
+
+            if 'PhoneNumber' not in missing_fields:
+                extracted_phone = extracted_info.get('PhoneNumber', '')
+                if extracted_phone and extracted_phone not in ["none", '(empty)']:
+                    if not validate_phone(extracted_phone):
+                        prompt = f"Please provide a valid Phone Number. The number you provided is not valid."
+                        user_response = transform_input(prompt)
+                        message = request.session.get(f'context{session_id}', '')
+                        message = message.replace(extracted_phone, '')
+                        request.session[f'context{session_id}'] = message
+                        return user_response
+
+            if len(missing_fields) == 1 and ('PhoneNumber' in missing_fields or 'Email' in missing_fields):
+                missing_fields = []
         print(extracted_info,'extracted_info')
         if missing_fields:
             prompt = f" Please provide your {', '.join(missing_fields)}: "
