@@ -1,4 +1,3 @@
-\
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render
@@ -423,7 +422,7 @@ def handle_user_input(user_input):
     
     if state["step"] == "start":
         if "book appointment" in user_input.lower():
-            
+            print('book appointment')
             chat_history = [
                                 {"role": "user", "content": "What are the available locations?"},
                                 {"role": "assistant", "content": "Here are the locations..."}
@@ -447,147 +446,162 @@ def handle_user_input(user_input):
             state["step"] = "location_selection"
             state["locations"] = locations
             print(locations)
+            print(state["step"])
             return locations
-
-        elif state["step"] == "location_selection":
-            try:
-                location_data = json.loads(user_input)  
-                location_id = int(location_data)
-                if any(loc['LocationId'] == location_id for loc in state["locations"]):
-                    state["location_selected"] = location_id
-                    result = agent_executor.invoke({
-                        "input": f"Get Providers for location {location_id}",
-                        "tools": [get_providers],
-                        "tool_names": "get_providers",
-                        "tool_description": get_providers.description,
-                        "tool_args": json.dumps({"location_id": location_id}),
-                        "agent_scratchpad": ""
-                    })
-                    providers = result['output']
-                    print("fhdb",providers)
-
-                    # Printing the extracted locations
-                    # for provider in providers:
-                    #     print(f"provider Name: {provider['Name']}, provider ID: {provider['ProviderId']}")
-                        
-                    json_output = json.dumps({"output": providers}, indent=4)
-                    print("RSG",json_output)
-                    state["step"] = "provider_selection"  # Move to the next step
-            
-                    state["providers"] = providers
-                    print(json_output,"fewjwij")
-                    return providers
-                else:
-                    return "Invalid providers ID. Please enter a prociders ID from the list provided."
-            
-            except ValueError:
-                return "Invalid input. 1111Please enter a numerical ID from the list provided."
-
-
-        elif state["step"] == "provider_selection":
-            try:
-                provider_id = int(user_input)
-                print("dfgxg",provider_id)
-
-                if any(provider['ProviderId'] == provider_id for provider in state["providers"]):
-                    state["provider_selected"] = provider_id
-                    location_id = state["location_selected"]
-                    print("dtrgdt",location_id)
-                    result = agent_executor.invoke({
-                        "input": f"Get Appointment Reasons when selected location:{location_id} and  selected provider is :{provider_id} ",
-                        "tools": [get_appointment_reasons],
-                        "tool_names": "get_appointment_reasons ",
-                        "tool_description": get_appointment_reasons.description,
-                        "tool_args": json.dumps({"provider_id": provider_id, "location_id": location_id}),
-                        #  "tool_args":get_appointment_reasons.args,
-                        "agent_scratchpad": ""
-                    })
-                    appointment_reasons = result['output']
-                    print("fhdb", appointment_reasons)
-
-                    # Print the extracted appointment reasons
-                    # reason_list = "\n".join(f"Reason ID: {reason['ReasonId']}, Reason: {reason['Reason']}" for reason in appointment_reasons)
-                    state["step"] = "appointment_reason_selection"
-                    state["appointment_reasons"] = appointment_reasons
-                    return appointment_reasons
-
-                else:
-                    return "Invalid provider ID. Please enter a valid ID from the list provided."
-
-            except ValueError:
-                return "Invalid input. Please enter a numerical ID from the list provided."
-
-        elif state["step"] == "appointment_reason_selection":
-            try:
-                appointment_reason_id = int(user_input)
-                state["appointment_reason_selected"] = appointment_reason_id
-                location_id = state["location_selected"]
-                provider_id = state["provider_selected"]
-                preferred_date_time = '2024-08-13T12:00:00'
+        else :
+            print('get_greeting_response')
+            # Generate a response for the greeting using the LLM
+            result = agent_executor.invoke({
+                "input": user_input,
+                "tools": [get_greeting_response],
+                "tool_names": "get_greeting_response",
+                "tool_description": get_greeting_response.description,
+                "tool_args": json.dumps({"greeting": user_input}),
+                "agent_scratchpad": ""
+            })
+            greeting_response = result.get('output', "I'm not sure how to respond to that greeting.")
+            return greeting_response
+    elif state["step"] == "location_selection":
+        try:
+            print("location_selection")
+            location_data = json.loads(user_input)  
+            location_id = int(location_data)
+            if any(loc['LocationId'] == location_id for loc in state["locations"]):
+                state["location_selected"] = location_id
                 result = agent_executor.invoke({
-                    "input": f"Get open slots for location {location_id}, provider {provider_id}, reason {appointment_reason_id}",
-                    "tools": [get_open_slots],
-                    "tool_names": "get_open_slots",
-                    "tool_description": get_open_slots.description,
-                    "tool_args": json.dumps({"preferred_date_time": preferred_date_time, "location_id": location_id, "reason_id": appointment_reason_id, "provider_id": provider_id}),
+                    "input": f"Get Providers for location {location_id}",
+                    "tools": [get_providers],
+                    "tool_names": "get_providers",
+                    "tool_description": get_providers.description,
+                    "tool_args": json.dumps({"location_id": location_id}),
                     "agent_scratchpad": ""
                 })
-                open_slots = result['output']
-                if open_slots:
-                    state["step"] = "slot_selection"
-                    state["open_slots"] = open_slots
-                    return open_slots
-                else:
-                    return "No open slots available. Please try again later."
+                providers = result['output']
+                print("fhdb",providers)
+
+                # Printing the extracted locations
+                # for provider in providers:
+                #     print(f"provider Name: {provider['Name']}, provider ID: {provider['ProviderId']}")
+                    
+                json_output = json.dumps({"output": providers}, indent=4)
+                print("RSG",json_output)
+                state["step"] = "provider_selection"  # Move to the next step
         
-            except ValueError:
-                return "Invalid appointment reason ID. Please enter a valid ID."
-
-        elif state["step"] == "slot_selection":
-            # try:
-                open_slot_id = int(user_input)
-                if any(slot['OpenSlotId'] == open_slot_id for slot in state["open_slots"]):
-                    state["open_slot_selected"] = open_slot_id
-                    location_id = state["location_selected"]
-                    provider_id = state["provider_selected"]
-                    preferred_date_time = '05/10/2024'
-                    first_name='preeti'
-                    last_name='sidana'
-                    DOB='12/09/1998'
-                    PhoneNumber='9874563210'
-                    Email='dmk@gmail.com'
-
-
-                    appointment_reason_id = state["appointment_reason_selected"]
-                    
-                    # Use the tool to book the appointment
-                    booking_result = agent_executor.invoke({
-                        "input": f"Book Appointment with location {location_id}, provider {provider_id}, reason {appointment_reason_id}, and slot {open_slot_id} ,first_name {first_name},last_name {last_name},DOB {DOB},preferred_date_time {preferred_date_time},PhoneNumber {PhoneNumber},Email{Email}",
-                        "tools": [book_appointment],
-                        "tool_names": "book_appointment",
-                        "tool_description": book_appointment.description,
-                        "tool_args": json.dumps({"location_id": location_id, "provider_id": provider_id, "appointment_reason_id": appointment_reason_id, "open_slot_id": open_slot_id}),
-                        "agent_scratchpad": ""
-                    })
-                    
-                    booking_response = booking_result['output']
-                    # state["step"] = "start"
-                    # state["location_selected"] = None
-                    # state["provider_selected"] = None
-                    # state["appointment_reason_selected"] = None
-                    # state["open_slot_selected"] = None
-                    
-                    # if booking_response.get("Status") == "Success":
-                        # return f"Your appointment has been booked successfully. Appointment ID: {booking_response['AppointmentId']}"
-            #         else:
-            #             return "Failed to book the appointment. Please try again."
-            #     else:
-            #         return "Invalid slot ID. Please enter a valid ID from the list provided."
-            # except ValueError:
-            #     return "Invalid input. Please enter a numerical ID from the list provided."
-                return booking_response
+                state["providers"] = providers
+                print(json_output,"fewjwij")
+                return providers
+            else:
+                return "Invalid providers ID. Please enter a prociders ID from the list provided."
         
-    if state["step"] == "start" :
+        except ValueError:
+            return "Invalid input. 1111Please enter a numerical ID from the list provided."
+
+
+    elif state["step"] == "provider_selection":
+        try:
+            provider_id = int(user_input)
+            print("dfgxg",provider_id)
+
+            if any(provider['ProviderId'] == provider_id for provider in state["providers"]):
+                state["provider_selected"] = provider_id
+                location_id = state["location_selected"]
+                print("dtrgdt",location_id)
+                result = agent_executor.invoke({
+                    "input": f"Get Appointment Reasons when selected location:{location_id} and  selected provider is :{provider_id} ",
+                    "tools": [get_appointment_reasons],
+                    "tool_names": "get_appointment_reasons ",
+                    "tool_description": get_appointment_reasons.description,
+                    "tool_args": json.dumps({"provider_id": provider_id, "location_id": location_id}),
+                    #  "tool_args":get_appointment_reasons.args,
+                    "agent_scratchpad": ""
+                })
+                appointment_reasons = result['output']
+                print("fhdb", appointment_reasons)
+
+                # Print the extracted appointment reasons
+                # reason_list = "\n".join(f"Reason ID: {reason['ReasonId']}, Reason: {reason['Reason']}" for reason in appointment_reasons)
+                state["step"] = "appointment_reason_selection"
+                state["appointment_reasons"] = appointment_reasons
+                return appointment_reasons
+
+            else:
+                return "Invalid provider ID. Please enter a valid ID from the list provided."
+
+        except ValueError:
+            return "Invalid input. Please enter a numerical ID from the list provided."
+
+    elif state["step"] == "appointment_reason_selection":
+        try:
+            appointment_reason_id = int(user_input)
+            state["appointment_reason_selected"] = appointment_reason_id
+            location_id = state["location_selected"]
+            provider_id = state["provider_selected"]
+            preferred_date_time = '2024-08-13T12:00:00'
+            result = agent_executor.invoke({
+                "input": f"Get open slots for location {location_id}, provider {provider_id}, reason {appointment_reason_id}",
+                "tools": [get_open_slots],
+                "tool_names": "get_open_slots",
+                "tool_description": get_open_slots.description,
+                "tool_args": json.dumps({"preferred_date_time": preferred_date_time, "location_id": location_id, "reason_id": appointment_reason_id, "provider_id": provider_id}),
+                "agent_scratchpad": ""
+            })
+            open_slots = result['output']
+            if open_slots:
+                state["step"] = "slot_selection"
+                state["open_slots"] = open_slots
+                return open_slots
+            else:
+                return "No open slots available. Please try again later."
+    
+        except ValueError:
+            return "Invalid appointment reason ID. Please enter a valid ID."
+
+    elif state["step"] == "slot_selection":
+        # try:
+            open_slot_id = int(user_input)
+            if any(slot['OpenSlotId'] == open_slot_id for slot in state["open_slots"]):
+                state["open_slot_selected"] = open_slot_id
+                location_id = state["location_selected"]
+                provider_id = state["provider_selected"]
+                preferred_date_time = '05/10/2024'
+                first_name='preeti'
+                last_name='sidana'
+                DOB='12/09/1998'
+                PhoneNumber='9874563210'
+                Email='dmk@gmail.com'
+
+
+                appointment_reason_id = state["appointment_reason_selected"]
+                
+                # Use the tool to book the appointment
+                booking_result = agent_executor.invoke({
+                    "input": f"Book Appointment with location {location_id}, provider {provider_id}, reason {appointment_reason_id}, and slot {open_slot_id} ,first_name {first_name},last_name {last_name},DOB {DOB},preferred_date_time {preferred_date_time},PhoneNumber {PhoneNumber},Email{Email}",
+                    "tools": [book_appointment],
+                    "tool_names": "book_appointment",
+                    "tool_description": book_appointment.description,
+                    "tool_args": json.dumps({"location_id": location_id, "provider_id": provider_id, "appointment_reason_id": appointment_reason_id, "open_slot_id": open_slot_id}),
+                    "agent_scratchpad": ""
+                })
+                
+                booking_response = booking_result['output']
+                # state["step"] = "start"
+                # state["location_selected"] = None
+                # state["provider_selected"] = None
+                # state["appointment_reason_selected"] = None
+                # state["open_slot_selected"] = None
+                
+                # if booking_response.get("Status") == "Success":
+                    # return f"Your appointment has been booked successfully. Appointment ID: {booking_response['AppointmentId']}"
+        #         else:
+        #             return "Failed to book the appointment. Please try again."
+        #     else:
+        #         return "Invalid slot ID. Please enter a valid ID from the list provided."
+        # except ValueError:
+        #     return "Invalid input. Please enter a numerical ID from the list provided."
+            return booking_response
+    
+    else :
+        print('get_greeting_response')
         # Generate a response for the greeting using the LLM
         result = agent_executor.invoke({
             "input": user_input,
@@ -599,7 +613,7 @@ def handle_user_input(user_input):
         })
         greeting_response = result.get('output', "I'm not sure how to respond to that greeting.")
         return greeting_response
-    return "Unexpected state. Please start over."
+        # return "Unexpected state. Please start over."
 
 
 def home(request):
@@ -640,9 +654,3 @@ def parse_output(output):
         return action, tool_input
     except (StopIteration, IndexError) as e:
         raise ValueError("Could not parse output correctly.") from e
-
-
-
-
-
-
