@@ -25,7 +25,7 @@ account_id = os.getenv("AccountId")
 account_password = os.getenv("AccountPassword")
 hugging_face_api_token = os.getenv("hugging_face_api_token")
 # print(hugging_face_api_token,'hugging_face_api_token')
-api_url = "https://rxn5d1umnqfncw3a.us-east-1.aws.endpoints.huggingface.cloud"
+api_url = "https://j1t7my9b1s4ixuzt.us-east-1.aws.endpoints.huggingface.cloud"
 headers = {
     "Authorization": "Bearer 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",  
     "Content-Type": "application/json"
